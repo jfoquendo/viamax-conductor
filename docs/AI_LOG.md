@@ -33,7 +33,7 @@
 - **Prompt:** "En una app de transporte con tarifas en pesos colombianos, ¿cómo redondeo el total calculado al múltiplo de 100 más cercano y aplico una tarifa mínima garantizada por categoría de vehículo?"
 - **Resumen de la respuesta:** Sugirió usar `Math.round(value / unit) * unit` para el redondeo y aplicar `Math.max(subtotal, minimumFare)` antes de redondear, para que la tarifa mínima también quede redondeada.
 - **Qué se usó / modificó / descartó:** Se adoptó la fórmula de redondeo. Se modificó el orden de operaciones: primero máximo entre subtotal y mínimo, luego redondeo. Se descartó `Math.ceil` porque generaba diferencias de hasta 99 COP innecesarias.
-- **Archivos y commit:** `src/utils/calculateFare.js`, `src/config/pricing.js` — pendiente de commit.
+- **Archivos y commit:** `src/utils/calculateFare.js`, `src/config/pricing.js` — 5a1789.
 - **Verificación:** Pendiente — se verificará con caso: 8.5 km, 22 min, categoría economy (resultado esperado: múltiplo de 100 ≥ 5000).
 - **Aprendizaje:** El orden de operaciones es crítico: redondear antes del mínimo puede dejar el mínimo sin redondear. En el futuro definiré los casos borde antes de escribir la función.
 
@@ -46,6 +46,19 @@
 - **Prompt:** "Muestra cómo estructurar el Tab.Navigator conectando las pantallas de registro PersonalData, VehicleData y Documents aplicando los tokens de tema"
 - **Resumen de la respuesta:** Se orientó la configuración de `createBottomTabNavigator` integrando las pantallas de registro, la personalización visual de `tabBarStyle`, `headerStyle` con tokens de color (`theme`) y el manejo de íconos dinámicos mediante `@expo/vector-icons`.
 - **Qué se usó / modificó / descartó:** Se adoptó la estructura de navegación declarativa con `screenOptions` y los íconos de Ionicons. Se adaptaron los nombres de las rutas (`PersonalData`, `VehicleData`, `Documents`) al flujo de la aplicación.
-- **Archivos y commit:** `src/navigation/RegisterTabNavigator.jsx`, `docs/AI_LOG.md` - [Hash de commit]
+- **Archivos y commit:** `src/navigation/RegisterTabNavigator.jsx`, `docs/AI_LOG.md` - c0753a2
 - **Verificación:** Probado en emulador de Android (Small_Phone:5554), navegación fluida entre pestañas y tema oscuro visible
 - **Aprendizaje:** Comprendí el uso de `screenOptions` centralizado en `Tab.Navigator` para vincular tokens de tema homogéneos y evitar duplicación de estilos en cada pantalla.
+
+### Entrada #5
+
+- **Fecha:** 2026-11-01 23:40 -05:00
+- **Integrante:** Jhon Oquendo
+- **Herramienta:** Antigravity (Google DeepMind)
+- **Objetivo:** Construir el formulario de registro completo en 3 pestañas con validaciones en tiempo real sin Alert, manejo de color híbrido y estado de aprobación
+- **Prompt:** "Genera la implementación de las 3 pantallas de registro (PersonalData, VehicleData, Documents) consumiendo RegistrationContext, InputField reutilizable, validaciones colombianas y botón de envío condicional"
+- **Resumen de la respuesta:** Se implementó InputField con errores debajo de cada campo, validators.js con regex colombiano (ABC123, cédula, celular, 18+ años), selector híbrido de color y bloqueo de botón de envío hasta completar las 3 pestañas con éxito
+- **Qué se usó / modificó / descartó:** Se aplicó la totalidad de las reglas de validación sin alerts. Se descartó una lista estática de colores a favor de un selector rápido + campo libre para no limitar opciones. Se guardó el perfil en AsyncStorage con status 'pending_approval'
+- **Archivos y commit:** src/components/forms/InputField.js, src/utils/validators.js, src/context/RegistrationContext.js, src/screens/registration/* — f9a3c5e
+- **Verificación:** Probado en emulador de Android: inputs validados, error inline en rojo y actualización de estado entre pestañas
+- **Aprendizaje:** Comprendí cómo centralizar validaciones reactivas con useMemo en el Context para que múltiples pantallas compartan el estado de validación global sin renderizados innecesarios
