@@ -1,38 +1,51 @@
---- ENTRADA IA ---
+### Entrada #1
 
-Fecha: 2026-11-01 20:40 -05:00
-Integrante: Jhon Oquendo
-Herramienta: Antigravity (Google DeepMind)
-Objetivo: Analizar el proyecto base existente e identificar su arquitectura para usarla como referencia en el nuevo proyecto
-Prompt: "Analiza el contenido de esta carpeta [proyecto base React Native]"
-Resumen de la respuesta: Se analizó la estructura del proyecto base (React Native + Expo SDK 57), se identificaron 3 bugs (imagen en Card.js, filtro en StartScreen.js, prop onAction en EstadoVacio.js) y se documentó la arquitectura completa de pantallas, contextos, hooks y tema
-Qué se usó / modificó / descartó: Se tomó como referencia la separación modular en carpetas (components, context, hooks, services, theme, screens). Se descartó la navegación manual de tabs para adoptar React Navigation oficial
-Archivos y commit: Ninguno — solo planificación y análisis
-Verificación: No aplica (fase de análisis)
-Aprendizaje: Entendí la importancia de revisar bugs en el código base antes de replicar patrones. El bug del filtro en StartScreen (operador || incorrecto) es un error común al combinar condiciones de filtrado
+- **Fecha:** 2026-11-01 20:40 -05:00
+- **Integrante:** Jhon Oquendo
+- **Herramienta:** Antigravity (Google DeepMind)
+- **Objetivo:** Analizar el proyecto base existente e identificar su arquitectura para usarla como referencia en el nuevo proyecto.
+- **Prompt:** "Analiza el contenido de esta carpeta [proyecto base React Native]"
+- **Resumen de la respuesta:** Se analizó la estructura del proyecto base (React Native + Expo SDK 57), se identificaron 3 bugs (imagen en Card.js, filtro en StartScreen.js, prop onAction en EstadoVacio.js) y se documentó la arquitectura completa de pantallas, contextos, hooks y tema.
+- **Qué se usó / modificó / descartó:** Se tomó como referencia la separación modular en carpetas (components, context, hooks, services, theme, screens). Se descartó la navegación manual de tabs para adoptar React Navigation oficial.
+- **Archivos y commit:** Ninguno — solo planificación y análisis.
+- **Verificación:** No aplica (fase de análisis).
+- **Aprendizaje:** Entendí la importancia de revisar bugs en el código base antes de replicar patrones. El bug del filtro en StartScreen (operador `||` incorrecto) es un error común al combinar condiciones de filtrado.
 
---- ENTRADA IA ---
+### Entrada #2
 
-Fecha: 2026-11-01 20:45 -05:00
-Integrante: Jhon Oquendo
-Herramienta: Antigravity (Google DeepMind)
-Objetivo: Definir la arquitectura del nuevo proyecto ViaMax y obtener un plan de trabajo por fases
-Prompt: "Toma como base esa estructura y genera un plan de trabajo para el siguiente proyecto [UberClone versión conductor]"
-Resumen de la respuesta: Se propuso arquitectura completa con 8 fases de desarrollo, estructura de carpetas src/, state machine del viaje, 3 navegadores (Stack, Tabs, Drawer), hooks personalizados requeridos y configuración de tarifas centralizada
-Qué se usó / modificó / descartó: Se aceptó la estructura general de carpetas y las 8 fases. Se ajustaron los nombres de carpetas de screens para agrupar por módulo. Se descartó Firebase por ahora, se implementará en fases posteriores
-Archivos y commit: Ninguno — solo planificación
-Verificación: No aplica (fase de planificación)
-Aprendizaje: Organizar screens por módulo (registration/, trip/, earnings/) en lugar de una carpeta plana facilita la navegación del código cuando el proyecto crece a 10+ pantallas
+- **Fecha:** 2026-11-01 20:45 -05:00
+- **Integrante:** Jhon Oquendo
+- **Herramienta:** Antigravity (Google DeepMind)
+- **Objetivo:** Definir la arquitectura del nuevo proyecto ViaMax y obtener un plan de trabajo por fases.
+- **Prompt:** "Toma como base esa estructura y genera un plan de trabajo para el siguiente proyecto [UberClone versión conductor]"
+- **Resumen de la respuesta:** Se propuso arquitectura completa con 8 fases de desarrollo, estructura de carpetas `src/`, state machine del viaje, 3 navegadores (Stack, Tabs, Drawer), hooks personalizados requeridos y configuración de tarifas centralizada.
+- **Qué se usó / modificó / descartó:** Se aceptó la estructura general de carpetas y las 8 fases. Se ajustaron los nombres de carpetas de screens para agrupar por módulo. Se descartó Firebase por ahora; se implementará en fases posteriores.
+- **Archivos y commit:** Ninguno — solo planificación.
+- **Verificación:** No aplica (fase de planificación).
+- **Aprendizaje:** Organizar screens por módulo (`registration/`, `trip/`, `earnings/`) en lugar de una carpeta plana facilita la navegación del código cuando el proyecto crece a 10+ pantallas.
 
---- ENTRADA IA ---
+### Entrada #3
 
-Fecha: 2026-11-01 21:41 -05:00
-Integrante: Jhon Oquendo
-Herramienta: Antigravity (Google DeepMind)
-Objetivo: Entender la fórmula correcta para redondear tarifas a múltiplos de 100 COP y aplicar tarifa mínima garantizada por categoría
-Prompt: "En una app de transporte con tarifas en pesos colombianos, ¿cómo redondeo el total calculado al múltiplo de 100 más cercano y aplico una tarifa mínima garantizada por categoría de vehículo?"
-Resumen de la respuesta: Sugirió usar Math.round(value / unit) * unit para el redondeo y aplicar Math.max(subtotal, minimumFare) antes de redondear, para que la tarifa mínima también quede redondeada
-Qué se usó / modificó / descartó: Se adoptó la fórmula de redondeo. Se modificó el orden de operaciones: primero máximo entre subtotal y mínimo, luego redondeo. Se descartó Math.ceil porque generaba diferencias de hasta 99 COP innecesarias
-Archivos y commit: src/utils/calculateFare.js, src/config/pricing.js — pendiente de commit
-Verificación: Pendiente — se verificará con caso: 8.5 km, 22 min, categoría economy (resultado esperado: múltiplo de 100 ≥ 5000)
-Aprendizaje: El orden de operaciones es crítico: redondear antes del mínimo puede dejar el mínimo sin redondear. En el futuro definiré los casos borde antes de escribir la función
+- **Fecha:** 2026-11-01 21:41 -05:00
+- **Integrante:** Jhon Oquendo
+- **Herramienta:** Antigravity (Google DeepMind)
+- **Objetivo:** Entender la fórmula correcta para redondear tarifas a múltiplos de 100 COP y aplicar tarifa mínima garantizada por categoría.
+- **Prompt:** "En una app de transporte con tarifas en pesos colombianos, ¿cómo redondeo el total calculado al múltiplo de 100 más cercano y aplico una tarifa mínima garantizada por categoría de vehículo?"
+- **Resumen de la respuesta:** Sugirió usar `Math.round(value / unit) * unit` para el redondeo y aplicar `Math.max(subtotal, minimumFare)` antes de redondear, para que la tarifa mínima también quede redondeada.
+- **Qué se usó / modificó / descartó:** Se adoptó la fórmula de redondeo. Se modificó el orden de operaciones: primero máximo entre subtotal y mínimo, luego redondeo. Se descartó `Math.ceil` porque generaba diferencias de hasta 99 COP innecesarias.
+- **Archivos y commit:** `src/utils/calculateFare.js`, `src/config/pricing.js` — pendiente de commit.
+- **Verificación:** Pendiente — se verificará con caso: 8.5 km, 22 min, categoría economy (resultado esperado: múltiplo de 100 ≥ 5000).
+- **Aprendizaje:** El orden de operaciones es crítico: redondear antes del mínimo puede dejar el mínimo sin redondear. En el futuro definiré los casos borde antes de escribir la función.
+
+### Entrada #4
+
+- **Fecha:** 2026-11-01
+- **Integrante:** Yeison David Uribe Tobon
+- **Herramienta:** Gemini
+- **Objetivo:** Consultar la estructura e implementación modular del navegador por pestañas (`RegisterTabNavigator`) articulado con los tokens de tema del proyecto.
+- **Prompt:** "Muestra cómo estructurar el Tab.Navigator conectando las pantallas de registro PersonalData, VehicleData y Documents aplicando los tokens de tema"
+- **Resumen de la respuesta:** Se orientó la configuración de `createBottomTabNavigator` integrando las pantallas de registro, la personalización visual de `tabBarStyle`, `headerStyle` con tokens de color (`theme`) y el manejo de íconos dinámicos mediante `@expo/vector-icons`.
+- **Qué se usó / modificó / descartó:** Se adoptó la estructura de navegación declarativa con `screenOptions` y los íconos de Ionicons. Se adaptaron los nombres de las rutas (`PersonalData`, `VehicleData`, `Documents`) al flujo de la aplicación.
+- **Archivos y commit:** `src/navigation/RegisterTabNavigator.jsx`, `docs/AI_LOG.md` - [Hash de commit]
+- **Verificación:** Probado en emulador de Android (Small_Phone:5554), navegación fluida entre pestañas y tema oscuro visible
+- **Aprendizaje:** Comprendí el uso de `screenOptions` centralizado en `Tab.Navigator` para vincular tokens de tema homogéneos y evitar duplicación de estilos en cada pantalla.
