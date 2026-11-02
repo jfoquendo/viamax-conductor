@@ -62,3 +62,17 @@
 - **Archivos y commit:** src/components/forms/InputField.js, src/utils/validators.js, src/context/RegistrationContext.js, src/screens/registration/* — f9a3c5e
 - **Verificación:** Probado en emulador de Android: inputs validados, error inline en rojo y actualización de estado entre pestañas
 - **Aprendizaje:** Comprendí cómo centralizar validaciones reactivas con useMemo en el Context para que múltiples pantallas compartan el estado de validación global sin renderizados innecesarios
+
+---
+
+### Entrada #6
+- **Fecha y Hora:** 2026-11-02, 12:56 AM
+- **Integrante:** Yeison David Uribe Tobon
+- **Herramienta:** Gemini
+- **Objetivo:** Estructurar la pantalla principal del mapa (`DriverHomeScreen`), el menú lateral (`MainDrawer`) y la lógica de transición post-registro.
+- **Prompt:** "Muestra cómo estructurar DriverHomeScreen con react-native-maps, toggle de disponibilidad con tracking en tiempo real, MainDrawer y transición automática al completar el registro"
+- **Resumen de la respuesta:** Se configuró useDriverLocation con watchPositionAsync y cleanup estricto en useEffect al apagar disponibilidad. Se integró MainDrawer con react-native-gesture-handler y transición fluida entre el registro y el mapa principal
+- **Qué se usó / modificó / descartó:** Se implementó el switch Disponible/No disponible con persistencia en AsyncStorage. Se corrigieron imports duplicados en DocumentsScreen y se conectó el callback onRegisterComplete para cambiar la vista al Drawer sin recargar
+- **Archivos y commit:** `src/hooks/useDriverLocation.js`, `src/screens/home/DriverHomeScreen.js`, `src/navigation/MainDrawer.js`, `src/screens/earnings/`, `src/screens/history/`, `src/screens/profile/*`, `App.js` — pendiente de commit
+- **Verificación:** Probado en emulador de Android: mapa interactivo, marcador centrado y flujo de navegación Drawer verificado
+- **Aprendizaje:** Comprobé la necesidad obligatoria de importar react-native-gesture-handler en la raíz al usar DrawerNavigator y el uso de cleanup functions para evitar fugas de memoria con el GPS
