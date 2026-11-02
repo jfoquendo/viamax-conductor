@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRegistration } from '../../context/RegistrationContext';
 import InputField from '../../components/forms/InputField';
-import { saveData, STORAGE_KEYS } from '../../services/storage';
+import { saveData, getData, STORAGE_KEYS } from '../../services/storage';
 import { colors, spacing, radius, typography } from '../../theme';
 
 export default function DocumentsScreen() {
@@ -26,6 +26,7 @@ export default function DocumentsScreen() {
         isVehicleValid,
         isDocumentsValid,
         canSubmitRegistration,
+        markRegistrationCompleted,
     } = useRegistration();
 
     const [touched, setTouched] = useState({});
@@ -100,7 +101,7 @@ export default function DocumentsScreen() {
                         if (profile) {
                             await saveData(STORAGE_KEYS.driverProfile, { ...profile, status: 'approved' });
                         }
-                        setSubmissionSuccess(false);
+                        markRegistrationCompleted();
                     }}
                 >
                     <Text style={styles.goToHomeButtonText}>Simular Aprobación y Entrar al Mapa</Text>

@@ -15,6 +15,8 @@ import {
 const RegistrationContext = createContext(null);
 
 export function RegistrationProvider({ children }) {
+  const [registrationCompleted, setRegistrationCompleted] = useState(false);
+
   // Pestaña 1: Datos Personales
   const [personalData, setPersonalData] = useState({
     profilePhoto: '',       // URI o URL de la foto de perfil
@@ -128,6 +130,10 @@ export function RegistrationProvider({ children }) {
   // El botón "Enviar registro" solo se activa cuando las 3 pestañas son válidas
   const canSubmitRegistration = isPersonalValid && isVehicleValid && isDocumentsValid;
 
+  const markRegistrationCompleted = () => {
+    setRegistrationCompleted(true);
+  };
+
   return (
     <RegistrationContext.Provider
       value={{
@@ -144,6 +150,8 @@ export function RegistrationProvider({ children }) {
         isVehicleValid,
         isDocumentsValid,
         canSubmitRegistration,
+        registrationCompleted,
+        markRegistrationCompleted,
       }}
     >
       {children}

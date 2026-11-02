@@ -4,8 +4,10 @@ import RegistrationTabs from './RegistrationTabs';
 import MainDrawer from './MainDrawer';
 import { getData, STORAGE_KEYS } from '../services/storage';
 import { colors } from '../theme';
+import { useRegistration } from '../context/RegistrationContext';
  
 export default function AppNavigator() {
+  const { registrationCompleted } = useRegistration();
   const [isLoading, setIsLoading] = useState(true);
   const [hasRegisteredProfile, setHasRegisteredProfile] = useState(false);
  
@@ -35,5 +37,5 @@ export default function AppNavigator() {
  
   // Si ya se registró, entra a la app con el Drawer (Home, Ganancias, etc.)
   // Si no se ha registrado, muestra las pestañas de registro
-  return hasRegisteredProfile ? <MainDrawer /> : <RegistrationTabs />;
+  return (hasRegisteredProfile || registrationCompleted) ? <MainDrawer /> : <RegistrationTabs />;
 }

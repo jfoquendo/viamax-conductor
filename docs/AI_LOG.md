@@ -73,6 +73,19 @@
 - **Prompt:** "Muestra cómo estructurar DriverHomeScreen con react-native-maps, toggle de disponibilidad con tracking en tiempo real, MainDrawer y transición automática al completar el registro"
 - **Resumen de la respuesta:** Se configuró useDriverLocation con watchPositionAsync y cleanup estricto en useEffect al apagar disponibilidad. Se integró MainDrawer con react-native-gesture-handler y transición fluida entre el registro y el mapa principal
 - **Qué se usó / modificó / descartó:** Se implementó el switch Disponible/No disponible con persistencia en AsyncStorage. Se corrigieron imports duplicados en DocumentsScreen y se conectó el callback onRegisterComplete para cambiar la vista al Drawer sin recargar
-- **Archivos y commit:** `src/hooks/useDriverLocation.js`, `src/screens/home/DriverHomeScreen.js`, `src/navigation/MainDrawer.js`, `src/screens/earnings/`, `src/screens/history/`, `src/screens/profile/*`, `App.js` — pendiente de commit
+- **Archivos y commit:** `src/hooks/useDriverLocation.js`, `src/screens/home/DriverHomeScreen.js`, `src/navigation/MainDrawer.js`, `src/screens/earnings/`, `src/screens/history/`, `src/screens/profile/*`, `App.js` — e9bcc06
 - **Verificación:** Probado en emulador de Android: mapa interactivo, marcador centrado y flujo de navegación Drawer verificado
 - **Aprendizaje:** Comprobé la necesidad obligatoria de importar react-native-gesture-handler en la raíz al usar DrawerNavigator y el uso de cleanup functions para evitar fugas de memoria con el GPS
+
+### Entrada #7
+
+- **Fecha:** 2026-11-02 01:27 -05:00
+- **Integrante:** Yeison David Uribe Tobon
+- **Herramienta:** gemini
+- **Objetivo:** Analizar por qué la simulación de aprobación en `DocumentsScreen` no permitía visualizar el módulo principal del conductor.
+- **Prompt:** "Analiza el DocumentsScreen y ayúdame a encontrar por qué al simular que ya está registrado no me deja visualizar la entrada al módulo"
+- **Resumen de la respuesta:** Se identificó que `DocumentsScreen` guardaba el perfil con estado `approved`, pero `AppNavigator` solo consultaba `AsyncStorage` al montarse. Al pulsar el botón de aprobación se cambiaba únicamente el estado local de la pantalla, sin actualizar el estado del navegador raíz, por lo que la aplicación permanecía en las pestañas de registro.
+- **Qué se usó / modificó / descartó:** Se añadió `registrationCompleted` y `markRegistrationCompleted` a `RegistrationContext`, se notificó la aprobación desde `DocumentsScreen` y se actualizó `AppNavigator` para mostrar `MainDrawer` cuando el registro se completa. Se descartó recargar manualmente la aplicación o depender de una nueva lectura de `AsyncStorage`.
+- **Archivos y commit:** `src/context/RegistrationContext.js`, `src/screens/registration/DocumentsScreen.js`, `src/navigation/AppNavigator.js` — 2cdd924.
+- **Verificación:** Pendiente — probar en el emulador completando el registro, pulsando "Simular Aprobación y Entrar al Mapa" y verificando la entrada inmediata al `MainDrawer`.
+- **Aprendizaje:** La persistencia en `AsyncStorage` no actualiza automáticamente el árbol de navegación. Cuando una pantalla modifica una condición que controla el navegador raíz, también debe comunicar el cambio mediante estado compartido o un callback explícito.
