@@ -89,3 +89,23 @@
 - **Archivos y commit:** `src/context/RegistrationContext.js`, `src/screens/registration/DocumentsScreen.js`, `src/navigation/AppNavigator.js` — 26c1307.
 - **Verificación:** Pendiente — probar en el emulador completando el registro, pulsando "Simular Aprobación y Entrar al Mapa" y verificando la entrada inmediata al `MainDrawer`.
 - **Aprendizaje:** La persistencia en `AsyncStorage` no actualiza automáticamente el árbol de navegación. Cuando una pantalla modifica una condición que controla el navegador raíz, también debe comunicar el cambio mediante estado compartido o un callback explícito.
+
+
+
+### Entrada #8
+
+- **Fecha:** 2026-11-04 01:30 -05:00
+- **Integrante:** Jhon Oquendo
+- **Herramienta:** Gemini
+- **Objetivo:** Priorizar el módulo de navegación del conductor: visualización y renderizado de Google Maps oficial, rastreo GPS en tiempo real con `useDriverLocation`, resolución de pantalla negra en emulador/físico y configuración de credenciales de Google Cloud Platform.
+- **Prompt:** "Quiero priorizar la navegación del conductor con mapa en tiempo real; revisa el proyecto, logs y por qué no se ve el mapa en emulador ni en celular físico, configurando la API oficial de Google Maps requerida en el documento."
+- **Resumen de la respuesta:** Se realizó un diagnóstico en profundidad analizando los logs de Android (`adb logcat`, `AirMapRenderer`, `GoogleApiManager`). Se identificó que la pantalla negra se debía a tres factores combinados: 1) En Expo SDK 58, `PROVIDER_GOOGLE` en Android requiere que la clave de API esté declarada tanto en `android.config.googleMaps` como en el plugin oficial `react-native-maps` dentro del arreglo de plugins de `app.json`; 2) El mapa requería dimensiones explícitas (`width: '100%', height: '100%'`) para evitar colapso de capa en el contenedor oscuro; 3) `customMapStyle` oscuro bloqueaba el lienzo durante la carga inicial de baldosas de Google.
+- **Qué se usó / modificó / descartó:** 
+  - Se habilitaron las APIs en Google Cloud Console (`Maps SDK for Android` y `Routes API` que unifica Directions y Distance Matrix).
+  - Se creó el archivo `.env.example` con la estructura de variables requerida por la rúbrica de seguridad.
+  - Se configuró el plugin de `react-native-maps` con `androidGoogleMapsApiKey` en `app.json`.
+  - Se garantizó `import 'react-native-gesture-handler'` en la línea 1 de `index.js`.
+  - En `DriverHomeScreen.js` se implementó la animación de cámara suave hacia las coordenadas GPS, marcador rotacional según el `heading`, botón flotante de centrado y se removió temporalmente la máscara de estilo oscuro custom.
+- **Archivos y commit:** `app.json`, `index.js`, `src/screens/home/DriverHomeScreen.js`, `.env.example`, `src/theme/mapDarkStyle.js` — pendiente de commit.
+- **Verificación:** Verificado con éxito tanto en el emulador de Android (Small_Phone:5554) como en dispositivo móvil físico: las calles, cuadrículas de Google Maps, marcador de vehículo y controles flotantes renderizan de forma nítida y fluida.
+- **Aprendizaje:** Comprendí que en proyectos modernos con Expo SDK 58, la inicialización de Google Maps nativo (`AirMapRenderer LATEST`) depende directamente del config-plugin de `react-native-maps` en `app.json` para inyectar correctamente los metadatos en el `AndroidManifest` en tiempo de empaquetado, y que forzar estilos oscuros saturados antes del primer renderizado de baldosas puede causar falsos positivos de fallo visual.
