@@ -1,7 +1,7 @@
-
-import React from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { colors, spacing, radius, typography } from '../../theme';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, radius, spacing, typography } from '../../theme';
 
 export default function InputField({
   label,
@@ -15,31 +15,59 @@ export default function InputField({
   maxLength,
   editable = true,
   helperText,
+  autoComplete,
+  textContentType,
+  returnKeyType,
+  onSubmitEditing,
 }) {
+  const [hidden, setHidden] = useState(true);
   const hasError = Boolean(error);
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label ? <Text style={styles.label}>{label}</Text> : null}
 
-      <TextInput
-        style={[
-          styles.input,
-          hasError && styles.inputError,
-          !editable && styles.inputDisabled,
-        ]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textSoft}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        autoCapitalize={autoCapitalize}
-        maxLength={maxLength}
-        editable={editable}
-      />
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[
+            styles.input,
+            secureTextEntry && styles.inputWithAccessory,
+            hasError && styles.inputError,
+            !editable && styles.inputDisabled,
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textSoft}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry ? hidden : false}
+          autoCapitalize={autoCapitalize}
+          maxLength={maxLength}
+          editable={editable}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          accessibilityLabel={label}
+        />
 
-     
+        {secureTextEntry ? (
+          <TouchableOpacity
+            style={styles.accessory}
+            onPress={() => setHidden((prev) => !prev)}
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? 'Mostrar contraseña' : 'Ocultar contraseña'}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={hidden ? 'eye-outline' : 'eye-off-outline'}
+              size={20}
+              color={colors.textSoft}
+            />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
       {hasError ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : helperText ? (
@@ -59,6 +87,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.xs,
   },
+  inputWrapper: {
+    position: 'relative',
+    width: '100%',
+  },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -68,6 +100,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: colors.text,
     fontSize: 15,
+    minHeight: 48,
+  },
+  inputWithAccessory: {
+    paddingRight: 46,
   },
   inputError: {
     borderColor: colors.danger,
@@ -76,6 +112,13 @@ const styles = StyleSheet.create({
   inputDisabled: {
     opacity: 0.5,
     backgroundColor: colors.cardBackground,
+  },
+  accessory: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   errorText: {
     color: colors.danger,

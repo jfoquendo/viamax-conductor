@@ -1,26 +1,19 @@
 // Pantalla de Datos Personales del Conductor
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRegistration } from '../../context/RegistrationContext';
 import InputField from '../../components/forms/InputField';
-import { colors, spacing, radius, typography } from '../../theme';
+import DateField from '../../components/forms/DateField';
+import StepFooter from '../../components/forms/StepFooter';
+import FormScreen from '../../components/FormScreen';
+import { colors, radius, spacing, typography } from '../../theme';
+import { addYears, todayStart } from '../../utils/date';
 
-export default function PersonalDataScreen() {
-  const {
-    personalData,
-    updatePersonalData,
-    personalErrors,
-  } = useRegistration();
+export default function PersonalDataScreen({ navigation }) {
+  const { personalData, updatePersonalData, personalErrors, isPersonalValid } =
+    useRegistration();
 
-  // Estado para mostrar errores solo después de interactuar con el campo (touched)
   const [touched, setTouched] = useState({});
 
   const markTouched = (field) => {
@@ -34,31 +27,41 @@ export default function PersonalDataScreen() {
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80',
     ];
-    // Asigna uno de prueba de forma aleatoria
-    const randomAvatar = sampleAvatars[Math.floor(Math.random() * sampleAvatars.length)];
+    const randomAvatar =
+      sampleAvatars[Math.floor(Math.random() * sampleAvatars.length)];
     updatePersonalData({ profilePhoto: randomAvatar });
     markTouched('profilePhoto');
   };
 
+  const handleNext = () => {
+    navigation.navigate('VehicleData');
+  };
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
+    <FormScreen
+      footer={
+        <StepFooter
+          step={1}
+          onNext={handleNext}
+          disabled={!isPersonalValid}
+          hint="Completa todos los campos para continuar"
+        />
+      }
     >
       <Text style={styles.sectionTitle}>Completa tus datos personales</Text>
       <Text style={styles.sectionSubtitle}>
         Todos los campos son obligatorios para poder activar tu cuenta
       </Text>
 
-
       <View style={styles.photoSection}>
-        <TouchableOpacity style={styles.avatarButton} onPress={selectPhoto}>
+        <TouchableOpacity
+          style={styles.avatarButton}
+          onPress={selectPhoto}
+          accessibilityRole="button"
+          accessibilityLabel="Seleccionar foto de perfil"
+        >
           {personalData.profilePhoto ? (
-            <Image
-              source={{ uri: personalData.profilePhoto }}
-              style={styles.avatarImage}
-            />
+            <Image source={{ uri: personalData.profilePhoto }} style={styles.avatarImage} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Ionicons name="camera-outline" size={36} color={colors.textSoft} />
@@ -66,11 +69,10 @@ export default function PersonalDataScreen() {
             </View>
           )}
         </TouchableOpacity>
-        {touched.profilePhoto && personalErrors.profilePhoto && (
+        {touched.profilePhoto && personalErrors.profilePhoto ? (
           <Text style={styles.photoError}>{personalErrors.profilePhoto}</Text>
-        )}
+        ) : null}
       </View>
-
 
       <InputField
         label="Nombre Completo"
@@ -83,9 +85,11 @@ export default function PersonalDataScreen() {
         error={touched.fullName ? personalErrors.fullName : null}
         maxLength={50}
         autoCapitalize="words"
+        autoComplete="name"
+        textContentType="name"
+        returnKeyType="next"
       />
 
-  
       <InputField
         label="Documento de Identidad (C.C.)"
         placeholder="Ej. 1020304050"
@@ -97,9 +101,9 @@ export default function PersonalDataScreen() {
         error={touched.idNumber ? personalErrors.idNumber : null}
         keyboardType="numeric"
         maxLength={10}
+        returnKeyType="next"
       />
 
-   
       <InputField
         label="Número de Celular"
         placeholder="Ej. 3001234567"
@@ -111,23 +115,25 @@ export default function PersonalDataScreen() {
         error={touched.phoneNumber ? personalErrors.phoneNumber : null}
         keyboardType="phone-pad"
         maxLength={10}
+        autoComplete="tel"
+        textContentType="telephoneNumber"
+        returnKeyType="next"
       />
 
-
-      <InputField
-        label="Fecha de Nacimiento (AAAA-MM-DD)"
-        placeholder="Ej. 1995-08-15"
+      <DateField
+        label="Fecha de Nacimiento"
         value={personalData.birthDate}
-        onChangeText={(text) => {
-          updatePersonalData({ birthDate: text });
+        onChange={(date) => {
+          updatePersonalData({ birthDate: date });
           markTouched('birthDate');
         }}
         error={touched.birthDate ? personalErrors.birthDate : null}
         helperText="Debes ser mayor de 18 años"
-        maxLength={10}
+        maximumDate={addYears(todayStart(), -18)}
+        defaultDate={addYears(todayStart(), -25)}
+        placeholder="Selecciona tu fecha de nacimiento"
       />
 
-  
       <View style={styles.fieldContainer}>
         <Text style={styles.fieldLabel}>Género</Text>
         <View style={styles.genderOptions}>
@@ -143,6 +149,8 @@ export default function PersonalDataScreen() {
                 personalData.gender === option.value && styles.genderButtonActive,
               ]}
               onPress={() => updatePersonalData({ gender: option.value })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: personalData.gender === option.value }}
             >
               <Text
                 style={[
@@ -157,7 +165,6 @@ export default function PersonalDataScreen() {
         </View>
       </View>
 
-
       <InputField
         label="Correo Electrónico"
         placeholder="conductor@viamax.com"
@@ -169,6 +176,39 @@ export default function PersonalDataScreen() {
         error={touched.email ? personalErrors.email : null}
         keyboardType="email-address"
         autoCapitalize="none"
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+      />
+
+      <InputField
+        label="Contraseña"
+        placeholder="Mínimo 8 caracteres, con letra y número"
+        value={personalData.password}
+        onChangeText={(text) => {
+          updatePersonalData({ password: text });
+          markTouched('password');
+        }}
+        error={touched.password ? personalErrors.password : null}
+        secureTextEntry
+        autoComplete="password-new"
+        textContentType="newPassword"
+        returnKeyType="next"
+      />
+
+      <InputField
+        label="Confirmar Contraseña"
+        placeholder="Repite la contraseña"
+        value={personalData.confirmPassword}
+        onChangeText={(text) => {
+          updatePersonalData({ confirmPassword: text });
+          markTouched('confirmPassword');
+        }}
+        error={touched.confirmPassword ? personalErrors.confirmPassword : null}
+        secureTextEntry
+        autoComplete="password-new"
+        textContentType="newPassword"
+        returnKeyType="done"
       />
 
       <View style={styles.fieldContainer}>
@@ -185,6 +225,8 @@ export default function PersonalDataScreen() {
                 personalData.language === lang.value && styles.genderButtonActive,
               ]}
               onPress={() => updatePersonalData({ language: lang.value })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: personalData.language === lang.value }}
             >
               <Text
                 style={[
@@ -198,19 +240,11 @@ export default function PersonalDataScreen() {
           ))}
         </View>
       </View>
-    </ScrollView>
+    </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  contentContainer: {
-    padding: spacing.lg,
-    paddingBottom: 40,
-  },
   sectionTitle: {
     ...typography.title,
     fontSize: 22,

@@ -1,29 +1,23 @@
 // Pantalla de Datos del Vehículo del Conductor
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRegistration } from '../../context/RegistrationContext';
 import InputField from '../../components/forms/InputField';
-import { colors, spacing, radius, typography } from '../../theme';
+import StepFooter from '../../components/forms/StepFooter';
+import FormScreen from '../../components/FormScreen';
+import { colors, radius, spacing, typography } from '../../theme';
 import { CATEGORY_LABELS, VEHICLE_CATEGORIES } from '../../config/pricing';
 
-export default function VehicleDataScreen() {
-  const {
-    vehicleData,
-    updateVehicleData,
-    vehicleErrors,
-  } = useRegistration();
+export default function VehicleDataScreen({ navigation }) {
+  const { vehicleData, updateVehicleData, vehicleErrors, isVehicleValid } =
+    useRegistration();
 
   const [touched, setTouched] = useState({});
   const commonColors = ['Negro', 'Blanco', 'Gris', 'Plata', 'Rojo', 'Azul'];
-  const [isCustomColor, setIsCustomColor] = useState(!commonColors.includes(vehicleData.color));
+  const [isCustomColor, setIsCustomColor] = useState(
+    !commonColors.includes(vehicleData.color)
+  );
 
   const markTouched = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -41,7 +35,6 @@ export default function VehicleDataScreen() {
     markTouched('vehiclePhoto');
   };
 
-  // Manejo de cambio de placa 
   const handlePlateChange = (text) => {
     const upperText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
     updateVehicleData({ licensePlate: upperText });
@@ -49,24 +42,31 @@ export default function VehicleDataScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
+    <FormScreen
+      footer={
+        <StepFooter
+          step={2}
+          onBack={() => navigation.navigate('PersonalData')}
+          onNext={() => navigation.navigate('Documents')}
+          disabled={!isVehicleValid}
+          hint="Completa los datos del vehículo para continuar"
+        />
+      }
     >
       <Text style={styles.sectionTitle}>Información de tu vehículo</Text>
       <Text style={styles.sectionSubtitle}>
         Registra el vehículo con el cual prestarás el servicio en ViaMax
       </Text>
 
-
       <View style={styles.photoSection}>
-        <TouchableOpacity style={styles.vehiclePhotoButton} onPress={selectVehiclePhoto}>
+        <TouchableOpacity
+          style={styles.vehiclePhotoButton}
+          onPress={selectVehiclePhoto}
+          accessibilityRole="button"
+          accessibilityLabel="Seleccionar foto del vehículo"
+        >
           {vehicleData.vehiclePhoto ? (
-            <Image
-              source={{ uri: vehicleData.vehiclePhoto }}
-              style={styles.vehiclePhotoImage}
-            />
+            <Image source={{ uri: vehicleData.vehiclePhoto }} style={styles.vehiclePhotoImage} />
           ) : (
             <View style={styles.photoPlaceholder}>
               <Ionicons name="car-outline" size={44} color={colors.textSoft} />
@@ -75,11 +75,10 @@ export default function VehicleDataScreen() {
             </View>
           )}
         </TouchableOpacity>
-        {touched.vehiclePhoto && vehicleErrors.vehiclePhoto && (
+        {touched.vehiclePhoto && vehicleErrors.vehiclePhoto ? (
           <Text style={styles.photoError}>{vehicleErrors.vehiclePhoto}</Text>
-        )}
+        ) : null}
       </View>
-
 
       <View style={styles.fieldContainer}>
         <Text style={styles.fieldLabel}>Categoría del Servicio</Text>
@@ -92,12 +91,14 @@ export default function VehicleDataScreen() {
                 vehicleData.category === catKey && styles.categoryButtonActive,
               ]}
               onPress={() => {
-                // Si pasa a XL y la capacidad es menor a 6, sugerimos 6
-                const newCap = (catKey === 'xl' && parseInt(vehicleData.passengerCapacity, 10) < 6)
-                  ? '6'
-                  : vehicleData.passengerCapacity;
+                const newCap =
+                  catKey === 'xl' && parseInt(vehicleData.passengerCapacity, 10) < 6
+                    ? '6'
+                    : vehicleData.passengerCapacity;
                 updateVehicleData({ category: catKey, passengerCapacity: newCap });
               }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: vehicleData.category === catKey }}
             >
               <Text
                 style={[
@@ -112,7 +113,6 @@ export default function VehicleDataScreen() {
         </View>
       </View>
 
- 
       <InputField
         label="Número de Placa (Formato Colombiano)"
         placeholder="ABC123"
@@ -122,8 +122,8 @@ export default function VehicleDataScreen() {
         autoCapitalize="characters"
         maxLength={6}
         helperText="3 letras seguidas de 3 números (sin espacios)"
+        returnKeyType="next"
       />
-
 
       <View style={styles.row}>
         <View style={styles.halfCol}>
@@ -137,6 +137,8 @@ export default function VehicleDataScreen() {
             }}
             error={touched.brand ? vehicleErrors.brand : null}
             maxLength={30}
+            autoCapitalize="words"
+            returnKeyType="next"
           />
         </View>
         <View style={styles.halfCol}>
@@ -150,10 +152,11 @@ export default function VehicleDataScreen() {
             }}
             error={touched.model ? vehicleErrors.model : null}
             maxLength={30}
+            autoCapitalize="words"
+            returnKeyType="next"
           />
         </View>
       </View>
-
 
       <View style={styles.row}>
         <View style={styles.halfCol}>
@@ -162,12 +165,13 @@ export default function VehicleDataScreen() {
             placeholder="Ej. 2022"
             value={vehicleData.year}
             onChangeText={(text) => {
-              updateVehicleData({ year: text });
+              updateVehicleData({ year: text.replace(/[^0-9]/g, '') });
               markTouched('year');
             }}
             error={touched.year ? vehicleErrors.year : null}
             keyboardType="numeric"
             maxLength={4}
+            returnKeyType="next"
           />
         </View>
         <View style={styles.halfCol}>
@@ -176,17 +180,17 @@ export default function VehicleDataScreen() {
             placeholder="Ej. 4"
             value={vehicleData.passengerCapacity}
             onChangeText={(text) => {
-              updateVehicleData({ passengerCapacity: text });
+              updateVehicleData({ passengerCapacity: text.replace(/[^0-9]/g, '') });
               markTouched('passengerCapacity');
             }}
             error={touched.passengerCapacity ? vehicleErrors.passengerCapacity : null}
             keyboardType="numeric"
             maxLength={2}
             helperText={vehicleData.category === 'xl' ? 'Mínimo 6 para XL' : null}
+            returnKeyType="next"
           />
         </View>
       </View>
-
 
       <View style={styles.fieldContainer}>
         <Text style={styles.fieldLabel}>Color del Vehículo</Text>
@@ -201,6 +205,11 @@ export default function VehicleDataScreen() {
               onPress={() => {
                 setIsCustomColor(false);
                 updateVehicleData({ color: col });
+                markTouched('color');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{
+                selected: !isCustomColor && vehicleData.color === col,
               }}
             >
               <Text
@@ -214,55 +223,46 @@ export default function VehicleDataScreen() {
             </TouchableOpacity>
           ))}
 
-          {/* Botón para habilitar color personalizado */}
           <TouchableOpacity
-            style={[
-              styles.colorPill,
-              isCustomColor && styles.colorPillActive,
-            ]}
+            style={[styles.colorPill, isCustomColor && styles.colorPillActive]}
             onPress={() => {
               setIsCustomColor(true);
               if (commonColors.includes(vehicleData.color)) {
                 updateVehicleData({ color: '' });
               }
+              markTouched('color');
             }}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isCustomColor }}
           >
-            <Text
-              style={[
-                styles.colorText,
-                isCustomColor && styles.colorTextActive,
-              ]}
-            >
+            <Text style={[styles.colorText, isCustomColor && styles.colorTextActive]}>
               + Otro
             </Text>
           </TouchableOpacity>
         </View>
 
-
-        {isCustomColor && (
+        {isCustomColor ? (
           <View style={{ marginTop: spacing.sm }}>
             <InputField
-              placeholder="Escribe el color de tu vehículo (ej. Vinotinto, Dorado)"
+              placeholder="Escribe el color (ej. Vinotinto, Dorado)"
               value={vehicleData.color}
-              onChangeText={(text) => updateVehicleData({ color: text })}
+              onChangeText={(text) => {
+                updateVehicleData({ color: text });
+                markTouched('color');
+              }}
+              error={touched.color ? vehicleErrors.color : null}
               autoCapitalize="words"
+              maxLength={20}
+              returnKeyType="done"
             />
           </View>
-        )}
+        ) : null}
       </View>
-    </ScrollView>
+    </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  contentContainer: {
-    padding: spacing.lg,
-    paddingBottom: 40,
-  },
   sectionTitle: {
     ...typography.title,
     fontSize: 22,

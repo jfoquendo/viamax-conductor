@@ -1,3 +1,4 @@
+import { calculateAge, parseDateOnly, todayStart } from './date';
 
 // Valida nombre completo: máximo 50 caracteres, solo letras y espacios
 export const validateFullName = (name) => {
@@ -26,19 +27,20 @@ export const validatePhoneNumber = (phone) => {
   return null;
 };
 
-// Valida fecha de nacimiento: el conductor debe tener al menos 18 años
+// Valida fecha de nacimiento: fecha real, no futura, edad entre 18 y 100 años
 export const validateBirthDate = (date) => {
   if (!date) return 'La fecha de nacimiento es obligatoria';
-  const today = new Date();
-  const birth = new Date(date);
-  
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
 
+  const birth = parseDateOnly(date);
+  if (!birth) return 'Usa el formato AAAA-MM-DD con una fecha válida';
+
+  const today = todayStart();
+  if (birth > today) return 'La fecha de nacimiento no puede ser futura';
+
+  const age = calculateAge(birth, today);
   if (age < 18) return 'El conductor debe ser mayor de 18 años';
+  if (age > 100) return 'Revisa la fecha de nacimiento';
+
   return null;
 };
 
@@ -47,6 +49,21 @@ export const validateEmail = (email) => {
   if (!email || !email.trim()) return 'El correo electrónico es obligatorio';
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email.trim())) return 'Ingresa un correo electrónico válido';
+  return null;
+};
+
+// Valida contraseña: mínimo 8 caracteres, al menos una letra y un número
+export const validatePassword = (password) => {
+  if (!password) return 'La contraseña es obligatoria';
+  if (password.length < 8) return 'Debe tener al menos 8 caracteres';
+  if (!/[A-Za-z]/.test(password)) return 'Debe incluir al menos una letra';
+  if (!/\d/.test(password)) return 'Debe incluir al menos un número';
+  return null;
+};
+
+export const validatePasswordMatch = (password, confirmation) => {
+  if (!confirmation) return 'Confirma la contraseña';
+  if (password !== confirmation) return 'Las contraseñas no coinciden';
   return null;
 };
 
@@ -64,7 +81,7 @@ export const validateVehicleYear = (year) => {
   if (!year || !String(year).trim()) return 'El año del vehículo es obligatorio';
   const strYear = String(year).trim();
   if (!/^\d{4}$/.test(strYear)) return 'Debe ser un año de 4 dígitos';
-  
+
   const numYear = parseInt(strYear, 10);
   const currentYear = new Date().getFullYear();
   if (numYear > currentYear) return `El año no puede ser mayor a ${currentYear}`;
@@ -77,17 +94,27 @@ export const validatePassengerCapacity = (capacity, category) => {
   if (!capacity || !String(capacity).trim()) return 'La capacidad es obligatoria';
   const num = parseInt(capacity, 10);
   if (isNaN(num) || num <= 0) return 'Debe ser un número mayor a cero';
+  if (num > 8) return 'La capacidad máxima es 8 pasajeros';
   if (category === 'xl' && num < 6) return 'La categoría XL exige mínimo 6 pasajeros';
   return null;
 };
 
-// Valida fecha futura (para licencias, SOAT y técnico-mecánica)
+// Valida el color del vehículo (selector rápido o texto libre)
+export const validateVehicleColor = (color) => {
+  if (!color || !String(color).trim()) return 'El color es obligatorio';
+  if (String(color).trim().length > 20) return 'Máximo 20 caracteres';
+  return null;
+};
+
+// Valida fecha futura (licencias, SOAT y técnico-mecánica)
 export const validateFutureDate = (date, fieldName = 'El documento') => {
   if (!date) return `${fieldName} es obligatorio`;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const checkDate = new Date(date);
-  
-  if (checkDate <= today) return `${fieldName} se encuentra vencido`;
+
+  const parsed = parseDateOnly(date);
+  if (!parsed) return `${fieldName} tiene una fecha inválida`;
+
+  const today = todayStart();
+  if (parsed <= today) return `${fieldName} se encuentra vencido`;
+
   return null;
 };

@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isNonEmptyString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    // Valida la forma mínima del registro. No sustituye la validación de la app,
+    // pero evita documentos vacíos o con placas/teléfonos inválidos.
+    function validRegistration(data) {
+      return data.uid is string
+        && data.status == 'pending_approval'
+        && data.personal is map
+        && data.vehicle is map
+        && data.documents is map
+        && isNonEmptyString(data.personal.fullName, 50)
+        && data.personal.idNumber is string
+        && data.personal.idNumber.matches('^[0-9]{6,10}$')
+        && data.personal.phoneNumber is string
+        && data.personal.phoneNumber.matches('^[0-9]{10}$')
+        && data.personal.email is string
+        && data.vehicle.licensePlate is string
+        && data.vehicle.licensePlate.matches('^[A-Z]{3}[0-9]{3}$')
+        && data.vehicle.category in ['economy', 'xl', 'premium']
+        && data.documents.acceptedTerms == true;
+    }
+
+    match /drivers/{uid} {
+      // Solo el propio conductor puede leer su documento.
+      allow read: if isOwner(uid);
+
+      // Alta inicial: siempre nace en pending_approval.
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && validRegistration(request.resource.data);
+
+      // Actualizaciones mientras siga pendiente:
+      // - no puede cambiar el estado ni el uid;
+      // - solo puede tocar datos del formulario.
+      allow update: if isOwner(uid)
+        && resource.data.status == 'pending_approval'
+        && request.resource.data.status == 'pending_approval'
+        && request.resource.data.uid == resource.data.uid
+        && validRegistration(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['personal', 'vehicle', 'documents', 'updatedAt', 'requiresTechReview']);
+
+      // Nadie borra perfiles desde el cliente.
+      allow delete: if false;
+    }
+
+    // Todo lo demás queda cerrado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
