@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import InputField from '../../components/forms/InputField';
 import DateField from '../../components/forms/DateField';
 import StepFooter from '../../components/forms/StepFooter';
-import FormScreen from '../../components/FormScreen';
+import FormScreen from '../../components/layout/FormScreen';
 import { colors, radius, spacing, typography } from '../../theme';
 import { addDays, addYears, todayStart } from '../../utils/date';
 

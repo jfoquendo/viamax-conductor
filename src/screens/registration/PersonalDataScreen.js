@@ -6,7 +6,7 @@ import { useRegistration } from '../../context/RegistrationContext';
 import InputField from '../../components/forms/InputField';
 import DateField from '../../components/forms/DateField';
 import StepFooter from '../../components/forms/StepFooter';
-import FormScreen from '../../components/FormScreen';
+import FormScreen from '../../components/layout/FormScreen';
 import { colors, radius, spacing, typography } from '../../theme';
 import { addYears, todayStart } from '../../utils/date';
 

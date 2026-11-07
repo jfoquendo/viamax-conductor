@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRegistration } from '../../context/RegistrationContext';
 import InputField from '../../components/forms/InputField';
 import StepFooter from '../../components/forms/StepFooter';
-import FormScreen from '../../components/FormScreen';
+import FormScreen from '../../components/layout/FormScreen';
 import { colors, radius, spacing, typography } from '../../theme';
 import { CATEGORY_LABELS, VEHICLE_CATEGORIES } from '../../config/pricing';
 
