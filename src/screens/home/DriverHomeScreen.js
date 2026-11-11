@@ -16,17 +16,21 @@ import useDriverLocation from '../../hooks/useDriverLocation';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { mapDarkStyle } from '../../theme/mapDarkStyle';
 import { getData, saveData, STORAGE_KEYS } from '../../services/storage';
+import { useAuth } from '../../context/AuthContext';
+import { publishDriverLocation } from '../../services/locationService';
 
 export default function DriverHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
+  const { user, profile, isFirebaseConfigured } = useAuth();
 
   // Estados locales
   const [isAvailable, setIsAvailable] = useState(false);
   const [driverProfile, setDriverProfile] = useState(null);
 
   // Hook de GPS en tiempo real
-  const { location, hasPermission, isTracking } = useDriverLocation(isAvailable);
+  const { location, hasPermission, isTracking, lastSyncAt, syncLocation } =
+    useDriverLocation(isAvailable);
 
   // Cargar estado inicial y perfil guardado
   useEffect(() => {
@@ -42,6 +46,12 @@ export default function DriverHomeScreen({ navigation }) {
 
     loadInitialData();
   }, []);
+
+  // Publica la ubicación en Firestore cuando cambia la posición.
+  useEffect(() => {
+    if (!isAvailable || !user?.uid) return;
+    syncLocation(location, user.uid);
+  }, [isAvailable, user?.uid, location.latitude, location.longitude, syncLocation]);
 
   // Animar cámara cuando la posición cambia y está disponible
   useEffect(() => {
@@ -85,6 +95,16 @@ export default function DriverHomeScreen({ navigation }) {
 
     setIsAvailable(value);
     await saveData(STORAGE_KEYS.isAvailable, value);
+
+    // Refleja el cambio de turno en la base de datos de inmediato,
+    // sin esperar al siguiente movimiento del GPS.
+    if (isFirebaseConfigured && user?.uid) {
+      try {
+        await publishDriverLocation(user.uid, location, value);
+      } catch (error) {
+        console.warn('No se pudo actualizar la disponibilidad:', error?.message);
+      }
+    }
 
     // Si se pone disponible, centramos la cámara de inmediato
     if (value && mapRef.current && location) {
@@ -180,8 +200,14 @@ export default function DriverHomeScreen({ navigation }) {
 
         {isTracking && (
           <View style={styles.trackingBanner}>
-            <Ionicons name="pulse" size={14} color={colors.primary} />
-            <Text style={styles.trackingText}>GPS en vivo activo</Text>
+            <Ionicons
+              name={lastSyncAt ? 'cloud-done-outline' : 'pulse'}
+              size={14}
+              color={colors.primary}
+            />
+            <Text style={styles.trackingText}>
+              {lastSyncAt ? 'Ubicación sincronizada' : 'GPS en vivo activo'}
+            </Text>
           </View>
         )}
       </View>
@@ -209,7 +235,7 @@ export default function DriverHomeScreen({ navigation }) {
           <View style={styles.metricDivider} />
           <View style={styles.metricItem}>
             <Text style={styles.metricLabel}>Horas activo</Text>
-            <Text style={styles.metricValue}>{isAvailable ? '0.1 h' : '0.0 h'}</Text>
+            <Text style={styles.metricValue}>{isAvailable ? 'En turno' : 'Fuera'}</Text>
           </View>
         </View>
       </View>

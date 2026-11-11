@@ -1,27 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
- 
+import { publishDriverLocation, shouldPublish } from '../services/locationService';
+
+// Ubicación inicial mientras llega el GPS (Medellín).
+const DEFAULT_LOCATION = {
+  latitude: 6.2442,
+  longitude: -75.5812,
+  latitudeDelta: 0.012,
+  longitudeDelta: 0.012,
+  heading: 0,
+};
+
 export default function useDriverLocation(isAvailable = false) {
-  // Ubicación por defecto (Medellín)
-  const [location, setLocation] = useState({
-    latitude: 6.2442,
-    longitude: -75.5812,
-    latitudeDelta: 0.012,
-    longitudeDelta: 0.012,
-    heading: 0,
-  });
- 
+  const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [hasPermission, setHasPermission] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
- 
-  // Referencia para la suscripción de watchPositionAsync
+  const [lastSyncAt, setLastSyncAt] = useState(null);
+
   const locationSubscriptionRef = useRef(null);
- 
-  // Solicitar permisos de ubicación al montar el hook
+
+  // Pide permisos y obtiene la primera posición al montar.
   useEffect(() => {
     let isMounted = true;
- 
+
     async function requestPermissions() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -32,14 +34,13 @@ export default function useDriverLocation(isAvailable = false) {
           }
           return;
         }
- 
+
         if (isMounted) {
           setHasPermission(true);
-          // Obtener la primera posición de inmediato
           const initialPos = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
- 
+
           setLocation((prev) => ({
             ...prev,
             latitude: initialPos.coords.latitude,
@@ -53,17 +54,31 @@ export default function useDriverLocation(isAvailable = false) {
         }
       }
     }
- 
+
     requestPermissions();
- 
+
     return () => {
       isMounted = false;
     };
   }, []);
- 
-  // Seguimiento en tiempo real con watchPosition y cleanup estricto
+
+  // Envía la posición al servidor solo si el conductor está disponible
+  // y si el movimiento supera el umbral definido en el servicio.
+  const syncLocation = useCallback(
+    async (coords, uid) => {
+      if (!uid || !shouldPublish(coords)) return;
+      try {
+        const written = await publishDriverLocation(uid, coords, true);
+        if (written) setLastSyncAt(Date.now());
+      } catch (error) {
+        setErrorMessage('No se pudo sincronizar la ubicación: ' + error.message);
+      }
+    },
+    []
+  );
+
+  // Seguimiento en tiempo real 
   useEffect(() => {
-    // Si no está disponible o no hay permisos, nos aseguramos de cancelar cualquier suscripción activa
     if (!isAvailable || !hasPermission) {
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
@@ -72,22 +87,22 @@ export default function useDriverLocation(isAvailable = false) {
       }
       return;
     }
- 
+
     let isSubscribed = true;
- 
+
     async function startLocationWatch() {
       try {
         setIsTracking(true);
- 
+
         const subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            timeInterval: 4000,      // Actualizar cada 4 segundos
-            distanceInterval: 5,     // O cada 5 metros recorridos
+            timeInterval: 4000,
+            distanceInterval: 5,
           },
           (newLocation) => {
             if (!isSubscribed) return;
- 
+
             const { latitude, longitude, heading } = newLocation.coords;
             setLocation((prev) => ({
               ...prev,
@@ -95,12 +110,9 @@ export default function useDriverLocation(isAvailable = false) {
               longitude,
               heading: heading || prev.heading,
             }));
- 
-            // Aquí se llamaría a la sincronización con Firestore o API backend
-            // syncLocationWithBackend({ latitude, longitude, heading });
           }
         );
- 
+
         locationSubscriptionRef.current = subscription;
       } catch (err) {
         if (isSubscribed) {
@@ -109,11 +121,9 @@ export default function useDriverLocation(isAvailable = false) {
         }
       }
     }
- 
+
     startLocationWatch();
- 
-    // FUNCIÓN DE LIMPIEZA OBLIGATORIA:
-    // Se ejecuta al pasar a 'No disponible' o desmontar el componente
+
     return () => {
       isSubscribed = false;
       if (locationSubscriptionRef.current) {
@@ -123,11 +133,13 @@ export default function useDriverLocation(isAvailable = false) {
       }
     };
   }, [isAvailable, hasPermission]);
- 
+
   return {
     location,
     hasPermission,
     errorMessage,
     isTracking,
+    lastSyncAt,
+    syncLocation,
   };
 }
