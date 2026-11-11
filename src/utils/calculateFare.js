@@ -1,44 +1,68 @@
-
-import { PRICING_CONFIG } from '../config/pricing';
+import { PRICING_CONFIG, roundFare } from '../config/pricing';
 
 /**
- * Calcula la tarifa total de un viaje.
- * @param {number} distanceKm 
- * @param {number} durationMin 
- * @param {string} category 
- * @param {number} tip 
- * @returns {object} 
+ * Calcula la tarifa de un viaje.
+ * @param {object} params
+ * @param {number} params.distanceKm  Distancia del recorrido en kilómetros.
+ * @param {number} params.durationMin Duración estimada en minutos.
+ * @param {'economy'|'xl'|'premium'} [params.category] Categoría del servicio.
+ * @param {number} [params.tip] Propina opcional (va completa al conductor).
+ * @returns {{fare:number, commission:number, driverEarnings:number,
+ *            baseFare:number, distanceCost:number, timeCost:number,
+ *            subtotal:number, category:string, commissionRate:number,
+ *            tip:number, total:number}}
  */
-export function calculateFare(distanceKm, durationMin, category = 'economy', tip = 0) {
+export function calculateFare({
+  distanceKm = 0,
+  durationMin = 0,
+  category = 'economy',
+  tip = 0,
+} = {}) {
   const config = PRICING_CONFIG;
+  const multiplier = config.categoryMultiplier[category];
 
-  // Calcular cada componente de la tarifa
-  const baseFare = config.baseFare[category];
-  const distanceCost = distanceKm * config.perKm[category];
-  const timeCost = durationMin * config.perMinute[category];
-  const subtotal = baseFare + distanceCost + timeCost + tip;
+  if (!multiplier) {
+    throw new Error(`Categoría de vehículo desconocida: ${category}`);
+  }
 
-  // Aplicar tarifa mínima si corresponde
-  const fareBeforeRounding = Math.max(subtotal, config.minimumFare[category]);
+  const distance = Number(distanceKm);
+  const duration = Number(durationMin);
+  if (!Number.isFinite(distance) || distance < 0) {
+    throw new Error('La distancia debe ser un número mayor o igual a cero');
+  }
+  if (!Number.isFinite(duration) || duration < 0) {
+    throw new Error('La duración debe ser un número mayor o igual a cero');
+  }
 
-  // Redondear al múltiplo de 100 COP más cercano
-  const totalFare = Math.round(fareBeforeRounding / config.roundingUnit) * config.roundingUnit;
+  const safeTip = Number(tip) > 0 ? Number(tip) : 0;
 
-  // Calcular comisión de la plataforma 
-  const platformCommission = Math.round((totalFare * config.commissionRate) / config.roundingUnit) * config.roundingUnit;
+  // Desglose antes del multiplicador y del mínimo.
+  const baseFare = config.baseFare;
+  const distanceCost = distance * config.perKm;
+  const timeCost = duration * config.perMinute;
 
-  // Ganancia neta del conductor
-  const driverEarnings = totalFare - platformCommission;
+  // Mínimo garantizado antes de aplicar la categoría.
+  const subtotal = Math.max(baseFare + distanceCost + timeCost, config.minimumFare);
+
+  // La tarifa se redondea; la propina se suma después, sin tocarla.
+  const fare = roundFare(subtotal * multiplier);
+
+  // La comisión no se redondea: el documento usa el valor exacto.
+  const commission = Math.round(fare * config.commissionRate);
 
   return {
-    baseFare,           
-    distanceCost,       
-    timeCost,           
-    tip,                
-    totalFare,          
-    platformCommission, 
-    driverEarnings,     
-    category,           
-    commissionRate: config.commissionRate, 
+    fare,
+    commission,
+    driverEarnings: fare - commission + safeTip,
+    baseFare,
+    distanceCost,
+    timeCost,
+    subtotal,
+    category,
+    commissionRate: config.commissionRate,
+    tip: safeTip,
+    total: fare + safeTip,
   };
 }
+
+export default calculateFare;

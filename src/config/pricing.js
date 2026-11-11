@@ -1,54 +1,49 @@
-
+// Configuración de tarifas de ViaMax.
+// Modelo único para todas las categorías: base + distancia + tiempo,
+// multiplicado por la categoría y con un mínimo garantizado.
 
 export const PRICING_CONFIG = {
-  //Rarifas
-  baseFare: {
-    economy: 3500,    // Económico
-    xl: 5000,         // categoría XL
-    premium: 8000,    // categoría Premium
+  // Tarifa base que cubre el abordaje.
+  baseFare: 3500,
+
+  // Costo por kilómetro y por minuto de viaje.
+  perKm: 1200,
+  perMinute: 250,
+
+  // Multiplicador por categoría de servicio.
+  categoryMultiplier: {
+    economy: 1.0,
+    xl: 1.4,
+    premium: 1.8,
   },
 
-  // Costo por kilómetro recorrido
-  perKm: {
-    economy: 1200,    //  km — Económico
-    xl: 1600,         //  km — XL
-    premium: 2200,    //  km — Premium
-  },
+  // Tarifa mínima garantizada (antes del multiplicador).
+  minimumFare: 6000,
 
-  // Costo por minuto de viaje
-  perMinute: {
-    economy: 200,     //  minuto — Económico
-    xl: 280,          //  minuto — XL
-    premium: 400,     //  minuto — Premium
-  },
+  // Comisión de la plataforma sobre la tarifa (la propina no se comisiona).
+  commissionRate: 0.2,
 
-  // Tarifa mínima garantizada por categoría
-  minimumFare: {
-    economy: 5000,    // Mínimo — Económico
-    xl: 8000,         // Mínimo — XL
-    premium: 15000,   // Mínimo — Premium
-  },
-
-  // Comisión de la plataforma (20%)
-  commissionRate: 0.20,
-
-  // Capacidad de pasajeros por categoría
-  passengerCapacity: {
-    economy: 4,       //  4 pasajeros — Económico
-    xl: 6,            //  6 pasajeros — XL 
-    premium: 4,       //  4 pasajeros — Premium
-  },
-
-  // Redondeo de tarifa al múltiplo más cercano 100 COP
+  // Redondeo de la tarifa al múltiplo más cercano de 100 COP.
   roundingUnit: 100,
+
+  // Capacidad de pasajeros por categoría.
+  passengerCapacity: {
+    economy: 4,
+    xl: 6,
+    premium: 4,
+  },
 };
 
-// Categorías válidas de vehículo
+// Categorías válidas de vehículo.
 export const VEHICLE_CATEGORIES = ['economy', 'xl', 'premium'];
 
-// Etiquetas en  para mostrar al usuario
+// Etiquetas para mostrar en la interfaz.
 export const CATEGORY_LABELS = {
   economy: 'Económico',
   xl: 'XL',
   premium: 'Premium',
 };
+
+// Redondea al múltiplo de 100 COP más cercano.
+export const roundFare = (value) =>
+  Math.round(value / PRICING_CONFIG.roundingUnit) * PRICING_CONFIG.roundingUnit;
