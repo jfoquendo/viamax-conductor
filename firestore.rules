@@ -81,6 +81,48 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    // Viajes. La lectura se limita al conductor asignado y a las solicitudes
+    // pendientes; la escritura solo avanza el estado y nunca toca los montos.
+    match /trips/{tripId} {
+      function isAssignedDriver() {
+        return request.auth != null
+          && resource.data.driverId is string
+          && resource.data.driverId == request.auth.uid;
+      }
+
+      function isPendingRequest() {
+        return request.auth != null && resource.data.status == 'requested';
+      }
+
+      function validTransition() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy']);
+      }
+
+      function allowedStatus() {
+        return request.resource.data.status in
+          ['accepted', 'cancelled', 'driver_arriving', 'in_progress', 'completed'];
+      }
+
+      // Un conductor puede ver solicitudes pendientes o sus propios viajes.
+      allow read: if isPendingRequest() || isAssignedDriver();
+
+      // Nadie crea viajes desde la app del conductor: los genera el pasajero
+      // o el dispatch.
+      allow create: if false;
+
+      // Aceptar una solicitud pendiente.
+      allow update: if validTransition()
+        && allowedStatus()
+        && (
+          (isPendingRequest() && request.resource.data.status == 'accepted'
+             && request.resource.data.driverId == request.auth.uid)
+          || (isAssignedDriver() && resource.data.status != 'requested')
+        );
+
+      allow delete: if false;
+    }
+
     // Todo lo demás queda cerrado.
     match /{document=**} {
       allow read, write: if false;
