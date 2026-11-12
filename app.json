@@ -1,24 +1,51 @@
 {
   "expo": {
-    "name": "viamax-conductor",
+    "name": "ViaMax",
     "slug": "viamax-conductor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.viamax.conductor",
+      "config": {
+        "googleMapsApiKey": ""
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.viamax.conductor",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ViaMax usa tu ubicación para mostrarte en el mapa y asignarte viajes cercanos."
+        }
+      ],
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyAo6s6pR0d98qfWt3wPZ_h0wqdM3RpDGA8"
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

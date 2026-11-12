@@ -1,0 +1,131 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isNonEmptyString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    // Valida la forma mínima del registro. No sustituye la validación de la app,
+    // pero evita documentos vacíos o con placas/teléfonos inválidos.
+    function validRegistration(data) {
+      return data.uid is string
+        && data.status == 'pending_approval'
+        && data.personal is map
+        && data.vehicle is map
+        && data.documents is map
+        && isNonEmptyString(data.personal.fullName, 50)
+        && data.personal.idNumber is string
+        && data.personal.idNumber.matches('^[0-9]{6,10}$')
+        && data.personal.phoneNumber is string
+        && data.personal.phoneNumber.matches('^[0-9]{10}$')
+        && data.personal.email is string
+        && data.vehicle.licensePlate is string
+        && data.vehicle.licensePlate.matches('^[A-Z]{3}[0-9]{3}$')
+        && data.vehicle.category in ['economy', 'xl', 'premium']
+        && data.documents.acceptedTerms == true;
+    }
+
+    match /drivers/{uid} {
+      // Solo el propio conductor puede leer su documento.
+      allow read: if isOwner(uid);
+
+      // Alta inicial: siempre nace en pending_approval.
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && validRegistration(request.resource.data);
+
+      // Actualizaciones mientras siga pendiente:
+      // - no puede cambiar el estado ni el uid;
+      // - solo puede tocar datos del formulario.
+      allow update: if isOwner(uid)
+        && resource.data.status == 'pending_approval'
+        && request.resource.data.status == 'pending_approval'
+        && request.resource.data.uid == resource.data.uid
+        && validRegistration(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['personal', 'vehicle', 'documents', 'updatedAt', 'requiresTechReview']);
+
+      // Nadie borra perfiles desde el cliente.
+      allow delete: if false;
+    }
+
+    // Ubicación y disponibilidad del conductor.
+    // Solo el propio conductor escribe (y solo sus propios campos);
+    // la escritura es frecuente pero no toca datos personales.
+    match /driver_locations/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -90
+        && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
+        && request.resource.data.isAvailable is bool;
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -90
+        && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
+        && request.resource.data.isAvailable is bool;
+      allow delete: if isOwner(uid);
+    }
+
+    // Viajes. La lectura se limita al conductor asignado y a las solicitudes
+    // pendientes; la escritura solo avanza el estado y nunca toca los montos.
+    match /trips/{tripId} {
+      function isAssignedDriver() {
+        return request.auth != null
+          && resource.data.driverId is string
+          && resource.data.driverId == request.auth.uid;
+      }
+
+      function isPendingRequest() {
+        return request.auth != null && resource.data.status == 'requested';
+      }
+
+      function validTransition() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy']);
+      }
+
+      function allowedStatus() {
+        return request.resource.data.status in
+          ['accepted', 'cancelled', 'driver_arriving', 'in_progress', 'completed'];
+      }
+
+      // Un conductor puede ver solicitudes pendientes o sus propios viajes.
+      allow read: if isPendingRequest() || isAssignedDriver();
+
+      // Nadie crea viajes desde la app del conductor: los genera el pasajero
+      // o el dispatch.
+      allow create: if false;
+
+      // Aceptar una solicitud pendiente.
+      allow update: if validTransition()
+        && allowedStatus()
+        && (
+          (isPendingRequest() && request.resource.data.status == 'accepted'
+             && request.resource.data.driverId == request.auth.uid)
+          || (isAssignedDriver() && resource.data.status != 'requested')
+        );
+
+      allow delete: if false;
+    }
+
+    // Todo lo demás queda cerrado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
