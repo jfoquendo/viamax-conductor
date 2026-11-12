@@ -83,8 +83,9 @@ const firestoreSource = {
     });
   },
 
-  async advance(tripId, status) {
+  async advance(tripId, status, extra = {}) {
     await updateDoc(doc(db, TRIPS_COLLECTION, tripId), {
+      ...extra,
       status,
       updatedAt: serverTimestamp(),
     });
@@ -130,8 +131,8 @@ export function createLocalSource() {
       emit();
     },
 
-    async advance(tripId, status) {
-      current = { ...current, status };
+    async advance(tripId, status, extra = {}) {
+      current = { ...current, ...extra, status };
       emit();
     },
 

@@ -85,19 +85,39 @@ export default function TripActiveScreen({ route, navigation }) {
     setIsWorking(true);
     setError(null);
     try {
-      await tripSource.advance(trip.id, next.status);
-      const updated = { ...trip, status: next.status };
-      setTrip(updated);
-
       if (next.status === TRIP_STATUS.COMPLETED) {
-        navigation?.replace?.('TripSummary', { tripId: trip.id, fare });
+        // Se guardan los montos y la fecha de cierre para que el historial
+        // y las ganancias tengan de dónde leer.
+        const distanceKm = liveRoute?.distanceKm ?? trip.distanceKm;
+        const durationMin = liveRoute?.durationMin ?? trip.durationMin;
+        const closingFare = fare ?? calculateFare({ distanceKm, durationMin, category: trip.category ?? category, tip: trip.tip ?? 0 });
+
+        await tripSource.advance(trip.id, next.status, {
+          distanceKm,
+          durationMin,
+          completedAt: new Date().toISOString(),
+          fare: closingFare.fare,
+          commission: closingFare.commission,
+          driverEarnings: closingFare.driverEarnings,
+          commissionRate: closingFare.commissionRate,
+          tip: closingFare.tip,
+          total: closingFare.total,
+        });
+
+        const updated = { ...trip, status: next.status, driverEarnings: closingFare.driverEarnings };
+        setTrip(updated);
+        navigation?.replace?.('TripSummary', { tripId: trip.id, fare: closingFare });
+        return;
       }
+
+      await tripSource.advance(trip.id, next.status);
+      setTrip({ ...trip, status: next.status });
     } catch (advanceError) {
       setError(advanceError?.message ?? 'No se pudo actualizar el viaje');
     } finally {
       setIsWorking(false);
     }
-  }, [next, trip, navigation, fare]);
+  }, [next, trip, navigation, fare, liveRoute, category]);
 
   const confirmCancel = () => {
     Alert.alert(

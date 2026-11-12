@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 const ROUTES_ENDPOINT = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
 // La misma clave que usa el mapa en app.json.
-const MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY ?? '';
+const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 
 // Caché en memoria: evita repetir la misma consulta mientras el viaje dura.
 const cache = new Map();
@@ -89,7 +89,7 @@ export async function fetchRoute(origin, destination, { force = false } = {}) {
   }
 
   if (!MAPS_API_KEY) {
-    const error = new Error('Falta GOOGLE_MAPS_API_KEY en el archivo .env');
+    const error = new Error('Falta EXPO_PUBLIC_GOOGLE_MAPS_API_KEY en el archivo .env');
     error.code = 'app/missing-key';
     throw error;
   }
