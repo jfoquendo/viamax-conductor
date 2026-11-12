@@ -11,6 +11,7 @@ import DriverHomeScreen from '../screens/home/DriverHomeScreen';
 import EarningsScreen from '../screens/earnings/EarningsScreen';
 import TripHistoryScreen from '../screens/history/TripHistoryScreen';
 import DriverProfileScreen from '../screens/profile/DriverProfileScreen';
+import TripRequestScreen from '../screens/trip/TripRequestScreen';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius, spacing, typography } from '../theme';
 
@@ -39,7 +40,7 @@ function CustomDrawerContent(props) {
       {
         text: 'Cerrar sesión',
         style: 'destructive',
-        onPress: () => logout().catch(() => {}),
+        onPress: () => logout().catch(() => { }),
       },
     ]);
   };
@@ -111,6 +112,18 @@ export default function MainDrawer() {
           title: 'Inicio / Turno',
           drawerIcon: ({ color, size }) => (
             <Ionicons name="map-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name="TripRequest"
+        component={TripRequestScreen}
+        options={{
+          title: 'Solicitudes',
+
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={color} />
           ),
         }}
       />
