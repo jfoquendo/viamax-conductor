@@ -7,6 +7,7 @@ import MainDrawer from './MainDrawer';
 import RegistrationTabs from './RegistrationTabs';
 import PendingApprovalScreen from '../screens/auth/PendingApprovalScreen';
 import TripActiveScreen from '../screens/trip/TripActiveScreen';
+import TripSummaryScreen from '../screens/trip/TripSummaryScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -33,6 +34,11 @@ function DriverStack() {
       <Stack.Screen
         name="TripActive"
         component={TripActiveScreen}
+        options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="TripSummary"
+        component={TripSummaryScreen}
         options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
       />
     </Stack.Navigator>
