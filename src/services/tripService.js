@@ -66,6 +66,34 @@ const firestoreSource = {
     );
   },
 
+
+  subscribeActive(driverId, onData, onError) {
+    if (!isFirebaseConfigured || !db || !driverId) {
+      onData(null);
+      return () => { };
+    }
+
+    const q = query(
+      collection(db, TRIPS_COLLECTION),
+      where('driverId', '==', driverId),
+      where('status', 'in', [
+        TRIP_STATUS.ACCEPTED,
+        TRIP_STATUS.DRIVER_ARRIVING,
+        TRIP_STATUS.IN_PROGRESS,
+      ]),
+      limit(1)
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const activeTrip = snapshot.empty ? null : toTrip(snapshot.docs[0]);
+        onData(activeTrip);
+      },
+      (error) => onError?.(error)
+    );
+  },
+
   async accept(tripId, driverId) {
     await updateDoc(doc(db, TRIPS_COLLECTION, tripId), {
       status: TRIP_STATUS.ACCEPTED,
@@ -83,8 +111,9 @@ const firestoreSource = {
     });
   },
 
-  async advance(tripId, status) {
+  async advance(tripId, status, extra = {}) {
     await updateDoc(doc(db, TRIPS_COLLECTION, tripId), {
+      ...extra,
       status,
       updatedAt: serverTimestamp(),
     });
@@ -113,6 +142,27 @@ export function createLocalSource() {
       return () => listeners.delete(handler);
     },
 
+    subscribeActive(driverId, onData) {
+      const handler = (data) => {
+        const trip = data.find(
+          (item) =>
+            item.driverId === driverId &&
+            [
+              TRIP_STATUS.ACCEPTED,
+              TRIP_STATUS.DRIVER_ARRIVING,
+              TRIP_STATUS.IN_PROGRESS,
+            ].includes(item.status)
+        );
+
+        onData(trip ?? null);
+      };
+
+      listeners.add(handler);
+      emit();
+
+      return () => listeners.delete(handler);
+    },
+
     // Simula que llega una solicitud nueva.
     simulateIncoming(overrides) {
       current = buildDemoRequest(overrides);
@@ -130,8 +180,8 @@ export function createLocalSource() {
       emit();
     },
 
-    async advance(tripId, status) {
-      current = { ...current, status };
+    async advance(tripId, status, extra = {}) {
+      current = { ...current, ...extra, status };
       emit();
     },
 

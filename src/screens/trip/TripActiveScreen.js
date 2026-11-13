@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { useActiveTrip } from '../../context/ActiveTripContext';
 import { tripSource } from '../../services/tripService';
 import { calculateFare } from '../../utils/calculateFare';
 import {
@@ -32,39 +33,16 @@ const NEXT_STEP = {
   [TRIP_STATUS.IN_PROGRESS]: { status: TRIP_STATUS.COMPLETED, label: 'Finalizar viaje' },
 };
 
-export default function TripActiveScreen({ route, navigation }) {
+export default function TripActiveScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const tripId = route?.params?.tripId;
+  const { activeTrip: trip, isLoading, error: activeTripError } = useActiveTrip();
 
-  const [trip, setTrip] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
   const [liveRoute, setLiveRoute] = useState(null);
 
   const category = profile?.vehicle?.category ?? 'economy';
-
-  // Carga el viaje y se mantiene al día con los cambios de estado.
-  useEffect(() => {
-    let isMounted = true;
-
-    async function load() {
-      try {
-        const data = tripId ? await tripSource.fetch(tripId) : null;
-        if (isMounted) setTrip(data);
-      } catch (loadError) {
-        if (isMounted) setError(loadError?.message ?? 'No se pudo cargar el viaje');
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [tripId]);
 
   const fare = useMemo(() => {
     if (!trip) return null;
@@ -86,8 +64,6 @@ export default function TripActiveScreen({ route, navigation }) {
     setError(null);
     try {
       await tripSource.advance(trip.id, next.status);
-      const updated = { ...trip, status: next.status };
-      setTrip(updated);
 
       if (next.status === TRIP_STATUS.COMPLETED) {
         navigation?.replace?.('TripSummary', { tripId: trip.id, fare });
@@ -233,7 +209,7 @@ export default function TripActiveScreen({ route, navigation }) {
           ) : null}
         </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {(error || activeTripError) ? (<Text style={styles.errorText}>{error || activeTripError}</Text>) : null}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>

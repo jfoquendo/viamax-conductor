@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import { ActiveTripProvider, useActiveTrip } from '../context/ActiveTripContext';
 import AuthNavigator from './AuthNavigator';
 import MainDrawer from './MainDrawer';
 import RegistrationTabs from './RegistrationTabs';
@@ -27,21 +28,54 @@ function Splash() {
   );
 }
 
-function DriverStack() {
+function DriverNavigator() {
+  const { activeTrip, isLoading } = useActiveTrip();
+
+  if (isLoading) {
+    return <Splash />;
+  }
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainDrawer" component={MainDrawer} />
+    <Stack.Navigator
+      initialRouteName={activeTrip ? 'TripActive' : 'MainDrawer'}
+      screenOptions={{ headerShown: false }}
+    >
+      <Stack.Screen
+        name="MainDrawer"
+        component={MainDrawer}
+      />
+
       <Stack.Screen
         name="TripActive"
         component={TripActiveScreen}
-        options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
+        initialParams={
+          activeTrip
+            ? { tripId: activeTrip.id }
+            : undefined
+        }
+        options={{
+          presentation: 'fullScreenModal',
+          gestureEnabled: false,
+        }}
       />
+
       <Stack.Screen
         name="TripSummary"
         component={TripSummaryScreen}
-        options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
+        options={{
+          presentation: 'fullScreenModal',
+          gestureEnabled: false,
+        }}
       />
     </Stack.Navigator>
+  );
+}
+
+function DriverStack() {
+  return (
+    <ActiveTripProvider>
+      <DriverNavigator />
+    </ActiveTripProvider>
   );
 }
 
