@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import useTripRequests from '../../hooks/useTripRequests';
+import { useTripRequestsContext } from '../../context/TripRequestsContext';
 import { useAuth } from '../../context/AuthContext';
 import { calculateFare } from '../../utils/calculateFare';
 import { tripSource } from '../../services/tripService';
@@ -14,15 +14,12 @@ const formatCOP = (value) =>
 
 export default function TripRequestScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const isDemo = tripSource.name === 'local';
   const [simulated, setSimulated] = useState(null);
 
   const { request, secondsLeft, progress, isResponding, error, accept, reject } =
-    useTripRequests({
-      enabled: Boolean(user?.uid),
-      driverId: user?.uid,
-    });
+  useTripRequestsContext();
 
   const category = profile?.vehicle?.category ?? 'economy';
 
