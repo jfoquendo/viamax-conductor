@@ -6,6 +6,7 @@ import { useTripRequestsContext } from '../../context/TripRequestsContext';
 import { useAuth } from '../../context/AuthContext';
 import { calculateFare } from '../../utils/calculateFare';
 import { tripSource } from '../../services/tripService';
+import { fetchRoute } from '../../services/routeService';
 import { PAYMENT_METHOD_LABELS, TRIP_STATUS } from '../../config/trips';
 import { colors, radius, spacing, typography, shadows } from '../../theme';
 
@@ -17,19 +18,22 @@ export default function TripRequestScreen({ navigation }) {
   const { profile } = useAuth();
   const isDemo = tripSource.name === 'local';
   const [simulated, setSimulated] = useState(null);
+  const [routeData, setRouteData] = useState(null);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const [routeWarning, setRouteWarning] = useState(null);
 
   const { request, secondsLeft, progress, isResponding, error, accept, reject } =
-  useTripRequestsContext();
+    useTripRequestsContext();
 
   const category = profile?.vehicle?.category ?? 'economy';
 
-  const fare = request
+  const fare = request && routeData && !isRouteLoading
     ? calculateFare({
-        distanceKm: request.distanceKm,
-        durationMin: request.durationMin,
-        category,
-        tip: request.tip ?? 0,
-      })
+      distanceKm: routeData.distanceKm,
+      durationMin: routeData.durationMin,
+      category,
+      tip: request.tip ?? 0,
+    })
     : null;
 
   const handleAccept = useCallback(async () => {
@@ -48,6 +52,61 @@ export default function TripRequestScreen({ navigation }) {
   useEffect(() => {
     if (!request) setSimulated(null);
   }, [request]);
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!request?.origin || !request?.destination) {
+      setRouteData(
+        request
+          ? {
+            distanceKm: request.distanceKm,
+            durationMin: request.durationMin,
+          }
+          : null
+      );
+
+      setIsRouteLoading(false);
+      setRouteWarning(
+        request
+          ? 'No hay coordenadas completas para calcular la ruta. Se muestran los datos estimados de la solicitud.'
+          : null
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setRouteData(null);
+    setRouteWarning(null);
+    setIsRouteLoading(true);
+
+    fetchRoute(request.origin, request.destination)
+      .then((route) => {
+        if (cancelled) return;
+
+        setRouteData(route);
+      })
+      .catch(() => {
+        if (cancelled) return;
+
+        setRouteData({
+          distanceKm: request.distanceKm,
+          durationMin: request.durationMin,
+        });
+        setRouteWarning(
+          'No se pudo calcular la ruta en tiempo real. Se muestran los datos estimados de la solicitud.'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRouteLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [request?.id]);
 
   if (!request) {
     return (
@@ -116,11 +175,11 @@ export default function TripRequestScreen({ navigation }) {
         <View style={styles.metricsRow}>
           <View style={styles.metric}>
             <Ionicons name="speedometer-outline" size={16} color={colors.textSoft} />
-            <Text style={styles.metricValue}>{request.distanceKm} km</Text>
+            <Text style={styles.metricValue}>{isRouteLoading ? '—' : `${routeData?.distanceKm ?? request.distanceKm} km`}</Text>
           </View>
           <View style={styles.metric}>
             <Ionicons name="time-outline" size={16} color={colors.textSoft} />
-            <Text style={styles.metricValue}>{request.durationMin} min</Text>
+            <Text style={styles.metricValue}>{isRouteLoading ? '—' : `${routeData?.durationMin ?? request.durationMin} min`}</Text>
           </View>
           <View style={styles.metric}>
             <Ionicons name="navigate-outline" size={16} color={colors.textSoft} />
@@ -141,6 +200,10 @@ export default function TripRequestScreen({ navigation }) {
           {fare ? formatCOP(fare.commission) : '—'}
         </Text>
       </View>
+
+      {routeWarning ? (
+        <Text style={styles.routeWarning}>{routeWarning}</Text>
+      ) : null}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -420,5 +483,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
     opacity: 0.8,
+  },
+  routeWarning: {
+    color: colors.warning,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
 });
