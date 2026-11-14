@@ -226,3 +226,17 @@
 - **Archivos y commit:** Se modificaron la pantalla del viaje activo, la pantalla de resumen de cobro, las reglas de Firestore y la pantalla de ganancias. Sin commit.
 - **Verificación:** Se validó la sintaxis de todos los archivos del proyecto sin errores. Queda pendiente confirmar en dispositivo el recorrido completo hasta el estado pagado y su aparición en ganancias.
 - **Aprendizaje:** Cuando una escritura falla y la interfaz navega igual, el fallo se vuelve invisible y parece que la acción no hizo nada. Separar el camino exitoso del camino de error fue lo que permitió identificar la regla faltante. Además, en Firestore un solo campo sin valor invalida la escritura completa, y las listas de estados permitidos deben actualizarse junto con el flujo que las usa.
+
+### Entrada #18
+
+- **Fecha:** 2026-11-14 17:07 .5;00
+- **Integrante:** Yeison David Uribe Tobon
+- **Herramienta:** Gemini
+- **Objetivo:** Revisar el resumen de ganancias frente a los requisitos de la actividad y complementar la información económica presentada para los periodos Hoy, Semana y Mes, conservando la consulta existente de viajes pagados.
+- **Prompt:** "La pantalla de Ganancias ya muestra los periodos Hoy, Semana y Mes, además del saldo pendiente. Al compararla con las instrucciones de la actividad, ¿qué información falta para que cada periodo presente también la facturación, las comisiones, las propinas, la ganancia neta y el promedio por viaje sin agregar consultas innecesarias a Firestore?"
+- **Resumen de la respuesta:** La revisión permitió identificar que la pantalla ya mostraba la cantidad de viajes y la ganancia del conductor por periodo, pero no presentaba todo el desglose económico solicitado. Se propuso reutilizar los viajes pagados que ya obtiene el hook para calcular, dentro de cada periodo, el total facturado, las comisiones, las propinas, la ganancia neta y el promedio por viaje, sin realizar consultas adicionales a Firestore.
+- **Qué se usó / modificó / descartó:** Se conservó la consulta existente de viajes pagados y la lógica del saldo pendiente. En useEarnings.js se añadió un resumen por rango de fechas que calcula cantidad de viajes, facturación, comisiones, propinas, ganancia neta y promedio. En EarningsScreen.js se amplió la información mostrada en las tarjetas Hoy, Semana y Mes. Se descartó realizar consultas adicionales a Firestore y se eliminó el cálculo independiente del promedio mensual porque el promedio quedó incluido dentro de cada periodo.
+- **Archivos y commit:** - **Archivos y commit:** src/hooks/useEarnings.js, src/screens/earnings/EarningsScreen.js - 1847579
+- **Verificación:** Se inició la aplicación después de los cambios y se comprobó que la pantalla de Ganancias abrió correctamente. Se verificó la presentación del saldo pendiente y del resumen ampliado para Hoy, Semana y Mes, incluyendo viajes, facturación, comisión, propinas, ganancia neta y promedio por viaje.
+- **Aprendizaje:** Cuando los viajes necesarios para construir un resumen ya están disponibles en memoria, es posible obtener diferentes indicadores económicos a partir de una sola consulta. Centralizar estos cálculos en el hook mantiene la pantalla enfocada en la presentación y evita duplicar reglas de cálculo en la interfaz.
+
