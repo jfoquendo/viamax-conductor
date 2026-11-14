@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useActiveTrip } from '../../context/ActiveTripContext';
+import useDriverLocation from '../../hooks/useDriverLocation';
 import { tripSource } from '../../services/tripService';
 import { calculateFare } from '../../utils/calculateFare';
 import {
@@ -33,16 +34,82 @@ const NEXT_STEP = {
   [TRIP_STATUS.IN_PROGRESS]: { status: TRIP_STATUS.COMPLETED, label: 'Finalizar viaje' },
 };
 
+function distanceBetweenMeters(from, to) {
+  if (!from || !to) return Infinity;
+
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const deltaLat = toRadians(to.latitude - from.latitude);
+  const deltaLng = toRadians(to.longitude - from.longitude);
+
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) *
+    Math.cos(lat2) *
+    Math.sin(deltaLng / 2) ** 2;
+
+  return (
+    2 *
+    earthRadiusMeters *
+    Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  );
+}
+
 export default function TripActiveScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const { activeTrip: trip, isLoading, error: activeTripError } = useActiveTrip();
+  const { location: driverLocation} = useDriverLocation(true);
 
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
+  const [routeOrigin, setRouteOrigin] = useState(null);
+  const [remainingRoute, setRemainingRoute] = useState(null);
+  const lastRouteUpdateRef = useRef(0);
+  const lastRouteLocationRef = useRef(null);
   const [liveRoute, setLiveRoute] = useState(null);
 
   const category = profile?.vehicle?.category ?? 'economy';
+  useEffect(() => {
+    if (
+      trip?.status !== TRIP_STATUS.IN_PROGRESS ||
+      !driverLocation?.latitude ||
+      !driverLocation?.longitude
+    ) {
+      return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastRouteUpdateRef.current;
+
+    const movedMeters = distanceBetweenMeters(
+      lastRouteLocationRef.current,
+      driverLocation
+    );
+
+    const shouldUpdate =
+      !lastRouteLocationRef.current ||
+      elapsed >= 30000 ||
+      movedMeters >= 500;
+
+    if (!shouldUpdate) return;
+
+    const nextOrigin = {
+      latitude: driverLocation.latitude,
+      longitude: driverLocation.longitude,
+    };
+
+    lastRouteUpdateRef.current = now;
+    lastRouteLocationRef.current = nextOrigin;
+    setRouteOrigin(nextOrigin);
+  }, [
+    trip?.status,
+    driverLocation?.latitude,
+    driverLocation?.longitude,
+  ]);
 
   const fare = useMemo(() => {
     if (!trip) return null;
@@ -139,12 +206,29 @@ export default function TripActiveScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <TripMapCard
-          origin={trip.origin}
-          destination={trip.destination}
-          onRouteLoaded={setLiveRoute}
-        />
 
+        <TripMapCard
+          origin={
+            currentStatus === TRIP_STATUS.IN_PROGRESS
+              ? routeOrigin ?? driverLocation
+              : trip.origin
+          }
+          destination={trip.destination}
+          driverLocation={driverLocation}
+          onRouteLoaded={(routeData) => {setRemainingRoute(routeData); setLiveRoute(routeData);}}
+        />
+        {currentStatus === TRIP_STATUS.IN_PROGRESS && remainingRoute ? (
+          <View style={styles.remainingBadge}>
+            <Ionicons
+              name="navigate-outline"
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.remainingText}>
+              faltan {remainingRoute.distanceKm} km · {remainingRoute.durationMin} min
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.card}>
           <Text style={styles.blockLabel}>Pasajero</Text>
           <Text style={styles.passenger}>{trip.passengerName ?? 'Pasajero'}</Text>
