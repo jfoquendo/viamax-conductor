@@ -89,7 +89,7 @@ export async function fetchRoute(origin, destination, { force = false } = {}) {
   }
 
   if (!MAPS_API_KEY) {
-    const error = new Error('Falta GOOGLE_MAPS_API_KEY en el archivo .env');
+    const error = new Error('Falta EXPO_PUBLIC_GOOGLE_MAPS_API_KEY en el archivo .env');
     error.code = 'app/missing-key';
     throw error;
   }

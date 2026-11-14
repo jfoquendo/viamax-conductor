@@ -94,9 +94,15 @@ service cloud.firestore {
         return request.auth != null && resource.data.status == 'requested';
       }
 
+      // Campos que el conductor puede escribir al avanzar el viaje.
+      // Los montos se escriben una sola vez, al cerrar el viaje.
       function validTransition() {
         return request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy']);
+          .hasOnly([
+            'status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy',
+            'completedAt', 'paidAt', 'distanceKm', 'durationMin',
+            'fare', 'commission', 'driverEarnings', 'commissionRate', 'tip', 'total',
+          ]);
       }
 
       function allowedStatus() {

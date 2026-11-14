@@ -66,7 +66,21 @@ export default function TripSummaryScreen({ route, navigation }) {
     setIsWorking(true);
     try {
       if (trip || tripId) {
-        await tripSource.advance(tripId, TRIP_STATUS.PAID);
+        // Se conservan los montos: la ganancia se consulta por estado pagado.
+        const paidFare = fare ?? null;
+        await tripSource.advance(tripId, TRIP_STATUS.PAID, {
+          paidAt: new Date().toISOString(),
+          ...(paidFare
+            ? {
+                fare: paidFare.fare,
+                commission: paidFare.commission,
+                driverEarnings: paidFare.driverEarnings,
+                commissionRate: paidFare.commissionRate,
+                tip: paidFare.tip,
+                total: paidFare.total,
+              }
+            : {}),
+        });
       }
     } catch (payError) {
       setError(payError?.message ?? 'No se pudo registrar el pago');
