@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useActiveTrip } from '../../context/ActiveTripContext';
 import useDriverLocation from '../../hooks/useDriverLocation';
+import { serverTimestamp } from 'firebase/firestore';
 import { tripSource } from '../../services/tripService';
 import { calculateFare } from '../../utils/calculateFare';
 import {
@@ -130,17 +131,43 @@ export default function TripActiveScreen({ navigation }) {
     setIsWorking(true);
     setError(null);
     try {
-      await tripSource.advance(trip.id, next.status);
-
       if (next.status === TRIP_STATUS.COMPLETED) {
-        navigation?.replace?.('TripSummary', { tripId: trip.id, fare });
+        // Se cierran los montos aqui para que el historial y las ganancias
+        // tengan de donde leer, usando la distancia real de la ruta.
+        const distanceKm = liveRoute?.distanceKm ?? trip.distanceKm;
+        const durationMin = liveRoute?.durationMin ?? trip.durationMin;
+        const closingFare =
+          fare ??
+          calculateFare({
+            distanceKm,
+            durationMin,
+            category: trip.category ?? category,
+            tip: trip.tip ?? 0,
+          });
+
+        await tripSource.advance(trip.id, next.status, {
+          distanceKm,
+          durationMin,
+          completedAt: serverTimestamp(),
+          fare: closingFare.fare,
+          commission: closingFare.commission,
+          driverEarnings: closingFare.driverEarnings,
+          commissionRate: closingFare.commissionRate,
+          tip: closingFare.tip,
+          total: closingFare.total,
+        });
+
+        navigation?.replace?.('TripSummary', { tripId: trip.id, fare: closingFare });
+        return;
       }
+
+      await tripSource.advance(trip.id, next.status);
     } catch (advanceError) {
       setError(advanceError?.message ?? 'No se pudo actualizar el viaje');
     } finally {
       setIsWorking(false);
     }
-  }, [next, trip, navigation, fare]);
+  }, [next, trip, navigation, fare, liveRoute, category]);
 
   const confirmCancel = () => {
     Alert.alert(

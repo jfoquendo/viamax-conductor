@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { serverTimestamp } from 'firebase/firestore';
 import { tripSource } from '../../services/tripService';
 import { calculateFare } from '../../utils/calculateFare';
 import { PAYMENT_METHOD_LABELS, TRIP_STATUS } from '../../config/trips';
@@ -65,14 +66,42 @@ export default function TripSummaryScreen({ route, navigation }) {
   const close = async () => {
     setIsWorking(true);
     try {
-      if (trip || tripId) {
-        await tripSource.advance(tripId, TRIP_STATUS.PAID);
+      if (!tripId) {
+        throw new Error('No se pudo identificar el viaje');
       }
-    } catch (payError) {
-      setError(payError?.message ?? 'No se pudo registrar el pago');
-    } finally {
+
+      // Se conservan los montos: la ganancia se consulta por estado pagado.
+      const paidFare = fare ?? null;
+      // Firestore rechaza campos undefined: solo se envian los que existen.
+      const paymentFields = {
+        paidAt: serverTimestamp(),
+      };
+
+      if (Number.isFinite(Number(trip?.distanceKm))) {
+        paymentFields.distanceKm = Number(trip.distanceKm);
+      }
+      if (Number.isFinite(Number(trip?.durationMin))) {
+        paymentFields.durationMin = Number(trip.durationMin);
+      }
+
+      if (paidFare) {
+        paymentFields.fare = paidFare.fare;
+        paymentFields.commission = paidFare.commission;
+        paymentFields.driverEarnings = paidFare.driverEarnings;
+        paymentFields.commissionRate = paidFare.commissionRate;
+        paymentFields.tip = paidFare.tip;
+        paymentFields.total = paidFare.total;
+      }
+
+      await tripSource.advance(tripId, TRIP_STATUS.PAID, paymentFields);
+
       setIsWorking(false);
       navigation?.reset?.({ index: 0, routes: [{ name: 'MainDrawer' }] });
+    } catch (payError) {
+      setIsWorking(false);
+      setError(
+        payError?.message ?? 'No se pudo registrar el pago. Intenta de nuevo.'
+      );
     }
   };
 

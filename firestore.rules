@@ -96,12 +96,18 @@ service cloud.firestore {
 
       function validTransition() {
         return request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy']);
+          // Los montos y las fechas de cierre se escriben una sola vez,
+          // al finalizar y al cobrar el viaje.
+          .hasOnly([
+            'status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy',
+            'completedAt', 'paidAt', 'distanceKm', 'durationMin',
+            'fare', 'commission', 'driverEarnings', 'commissionRate', 'tip', 'total',
+          ]);
       }
 
       function allowedStatus() {
         return request.resource.data.status in
-          ['accepted', 'cancelled', 'driver_arriving', 'in_progress', 'completed'];
+          ['accepted', 'cancelled', 'driver_arriving', 'in_progress', 'completed', 'paid'];
       }
 
       // Un conductor puede ver solicitudes pendientes o sus propios viajes.
