@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { uploadImageToCloudinary } from '../../services/cloudinaryService';
+import { selectImageSource } from '../../utils/imagePicker';
 import { useRegistration } from '../../context/RegistrationContext';
 import { useAuth } from '../../context/AuthContext';
 import InputField from '../../components/forms/InputField';
@@ -29,20 +31,56 @@ export default function DocumentsScreen({ navigation }) {
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [uploadingField, setUploadingField] = useState(null);
+  const [uploadErrors, setUploadErrors] = useState({});
+
 
   const markTouched = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Simulación de subida de fotos de documentos
-  const selectDocumentPhoto = (field) => {
-    const sampleDocs = [
-      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80',
-      'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80',
-    ];
-    const randomDoc = sampleDocs[Math.floor(Math.random() * sampleDocs.length)];
-    updateDocumentsData({ [field]: randomDoc });
+  const DOCUMENT_FOLDERS = {
+    driverLicensePhoto: 'viamax/drivers/documents/license',
+    soatPhoto: 'viamax/drivers/documents/soat',
+    techReviewPhoto: 'viamax/drivers/documents/tech-review',
+  };
+
+  const selectDocumentPhoto = async (field) => {
+    if (uploadingField) return;
+
     markTouched(field);
+    setUploadErrors((prev) => ({
+      ...prev,
+      [field]: null,
+    }));
+
+    try {
+      const imageUri = await selectImageSource();
+
+      if (!imageUri) return;
+
+      setUploadingField(field);
+
+      const uploaded = await uploadImageToCloudinary(
+        imageUri,
+        {
+          folder: DOCUMENT_FOLDERS[field],
+        }
+      );
+
+      updateDocumentsData({
+        [field]: uploaded.url,
+      });
+    } catch (error) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [field]:
+          error?.message ??
+          'No se pudo subir la imagen del documento',
+      }));
+    } finally {
+      setUploadingField(null);
+    }
   };
 
   // La técnico-mecánica aplica desde los 5 años de antigüedad.
@@ -132,20 +170,48 @@ export default function DocumentsScreen({ navigation }) {
         <TouchableOpacity
           style={styles.uploadDocButton}
           onPress={() => selectDocumentPhoto('driverLicensePhoto')}
+          disabled={Boolean(uploadingField)}
           accessibilityRole="button"
         >
-          {documentsData.driverLicensePhoto ? (
+          {uploadingField === 'driverLicensePhoto' ? (
+            <View style={styles.uploadRow}>
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+              />
+              <Text style={styles.uploadButtonText}>
+                Subiendo licencia…
+              </Text>
+            </View>
+          ) : documentsData.driverLicensePhoto ? (
             <View style={styles.uploadedRow}>
-              <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-              <Text style={styles.uploadedText}>Foto de Licencia Cargada</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={22}
+                color={colors.primary}
+              />
+              <Text style={styles.uploadedText}>
+                Foto de Licencia Cargada
+              </Text>
             </View>
           ) : (
             <View style={styles.uploadRow}>
-              <Ionicons name="cloud-upload-outline" size={20} color={colors.textSoft} />
-              <Text style={styles.uploadButtonText}>Subir Foto de Licencia</Text>
+              <Ionicons
+                name="camera-outline"
+                size={20}
+                color={colors.textSoft}
+              />
+              <Text style={styles.uploadButtonText}>
+                Cámara o Galería: Licencia
+              </Text>
             </View>
           )}
         </TouchableOpacity>
+        {uploadErrors.driverLicensePhoto ? (
+          <Text style={styles.errorText}>
+            {uploadErrors.driverLicensePhoto}
+          </Text>
+        ) : null}
         {touched.driverLicensePhoto && documentsErrors.driverLicensePhoto ? (
           <Text style={styles.errorText}>{documentsErrors.driverLicensePhoto}</Text>
         ) : null}
@@ -170,20 +236,45 @@ export default function DocumentsScreen({ navigation }) {
         <TouchableOpacity
           style={styles.uploadDocButton}
           onPress={() => selectDocumentPhoto('soatPhoto')}
+          disabled={Boolean(uploadingField)}
           accessibilityRole="button"
         >
-          {documentsData.soatPhoto ? (
+          {uploadingField === 'soatPhoto' ? (
+            <View style={styles.uploadRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.uploadButtonText}>
+                Subiendo SOAT…
+              </Text>
+            </View>
+          ) : documentsData.soatPhoto ? (
             <View style={styles.uploadedRow}>
-              <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-              <Text style={styles.uploadedText}>Foto de SOAT Cargada</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={22}
+                color={colors.primary}
+              />
+              <Text style={styles.uploadedText}>
+                Foto de SOAT Cargada
+              </Text>
             </View>
           ) : (
             <View style={styles.uploadRow}>
-              <Ionicons name="cloud-upload-outline" size={20} color={colors.textSoft} />
-              <Text style={styles.uploadButtonText}>Subir Foto de SOAT</Text>
+              <Ionicons
+                name="camera-outline"
+                size={20}
+                color={colors.textSoft}
+              />
+              <Text style={styles.uploadButtonText}>
+                Cámara o Galería: SOAT
+              </Text>
             </View>
           )}
         </TouchableOpacity>
+        {uploadErrors.soatPhoto ? (
+          <Text style={styles.errorText}>
+            {uploadErrors.soatPhoto}
+          </Text>
+        ) : null}
         {touched.soatPhoto && documentsErrors.soatPhoto ? (
           <Text style={styles.errorText}>{documentsErrors.soatPhoto}</Text>
         ) : null}
@@ -212,20 +303,48 @@ export default function DocumentsScreen({ navigation }) {
           <TouchableOpacity
             style={styles.uploadDocButton}
             onPress={() => selectDocumentPhoto('techReviewPhoto')}
+            disabled={Boolean(uploadingField)}
             accessibilityRole="button"
           >
-            {documentsData.techReviewPhoto ? (
+            {uploadingField === 'techReviewPhoto' ? (
+              <View style={styles.uploadRow}>
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                />
+                <Text style={styles.uploadButtonText}>
+                  Subiendo técnico-mecánica…
+                </Text>
+              </View>
+            ) : documentsData.techReviewPhoto ? (
               <View style={styles.uploadedRow}>
-                <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-                <Text style={styles.uploadedText}>Foto de RTM Cargada</Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={22}
+                  color={colors.primary}
+                />
+                <Text style={styles.uploadedText}>
+                  Foto de RTM Cargada
+                </Text>
               </View>
             ) : (
               <View style={styles.uploadRow}>
-                <Ionicons name="cloud-upload-outline" size={20} color={colors.textSoft} />
-                <Text style={styles.uploadButtonText}>Subir Foto de RTM</Text>
+                <Ionicons
+                  name="camera-outline"
+                  size={20}
+                  color={colors.textSoft}
+                />
+                <Text style={styles.uploadButtonText}>
+                  Cámara o Galería: RTM
+                </Text>
               </View>
             )}
           </TouchableOpacity>
+          {uploadErrors.techReviewPhoto ? (
+            <Text style={styles.errorText}>
+              {uploadErrors.techReviewPhoto}
+            </Text>
+          ) : null}
           {touched.techReviewPhoto && documentsErrors.techReviewPhoto ? (
             <Text style={styles.errorText}>{documentsErrors.techReviewPhoto}</Text>
           ) : null}

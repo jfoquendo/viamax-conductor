@@ -2,7 +2,9 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 import { useRegistration } from '../../context/RegistrationContext';
+import { selectImageSource } from '../../utils/imagePicker';
 import InputField from '../../components/forms/InputField';
 import StepFooter from '../../components/forms/StepFooter';
 import FormScreen from '../../components/layout/FormScreen';
@@ -14,6 +16,8 @@ export default function VehicleDataScreen({ navigation }) {
     useRegistration();
 
   const [touched, setTouched] = useState({});
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState(null);
   const commonColors = ['Negro', 'Blanco', 'Gris', 'Plata', 'Rojo', 'Azul'];
   const [isCustomColor, setIsCustomColor] = useState(
     !commonColors.includes(vehicleData.color)
@@ -23,16 +27,36 @@ export default function VehicleDataScreen({ navigation }) {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Simulación de foto de vehículo (debe verse la placa según requisitos)
-  const selectVehiclePhoto = () => {
-    const sampleCars = [
-      'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=600&q=80',
-      'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=80',
-      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80',
-    ];
-    const randomCar = sampleCars[Math.floor(Math.random() * sampleCars.length)];
-    updateVehicleData({ vehiclePhoto: randomCar });
+  const selectVehiclePhoto = async () => {
+    if (isUploadingPhoto) return;
+
     markTouched('vehiclePhoto');
+    setPhotoUploadError(null);
+
+    try {
+      const imageUri = await selectImageSource();
+
+      if (!imageUri) return;
+
+      setIsUploadingPhoto(true);
+
+      const uploaded = await uploadImageToCloudinary(
+        imageUri,
+        {
+          folder: 'viamax/drivers/vehicle',
+        }
+      );
+
+      updateVehicleData({
+        vehiclePhoto: uploaded.url,
+      });
+    } catch (error) {
+      setPhotoUploadError(
+        error?.message ?? 'No se pudo subir la foto del vehículo'
+      );
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const handlePlateChange = (text) => {
@@ -62,6 +86,7 @@ export default function VehicleDataScreen({ navigation }) {
         <TouchableOpacity
           style={styles.vehiclePhotoButton}
           onPress={selectVehiclePhoto}
+          disabled={isUploadingPhoto}
           accessibilityRole="button"
           accessibilityLabel="Seleccionar foto del vehículo"
         >
@@ -75,6 +100,17 @@ export default function VehicleDataScreen({ navigation }) {
             </View>
           )}
         </TouchableOpacity>
+        {isUploadingPhoto ? (
+          <Text style={styles.photoStatus}>
+            Subiendo foto…
+          </Text>
+        ) : null}
+
+        {photoUploadError ? (
+          <Text style={styles.photoError}>
+            {photoUploadError}
+          </Text>
+        ) : null}
         {touched.vehiclePhoto && vehicleErrors.vehiclePhoto ? (
           <Text style={styles.photoError}>{vehicleErrors.vehiclePhoto}</Text>
         ) : null}
@@ -381,5 +417,11 @@ const styles = StyleSheet.create({
   },
   colorTextActive: {
     color: colors.primary,
+  },
+  photoStatus: {
+    color: colors.primary,
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '600',
   },
 });
