@@ -62,7 +62,7 @@ export default function TripActiveScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const { activeTrip: trip, isLoading, error: activeTripError } = useActiveTrip();
-  const { location: driverLocation} = useDriverLocation(true);
+  const { location: driverLocation } = useDriverLocation(true);
 
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
@@ -215,7 +215,7 @@ export default function TripActiveScreen({ navigation }) {
           }
           destination={trip.destination}
           driverLocation={driverLocation}
-          onRouteLoaded={(routeData) => {setRemainingRoute(routeData); setLiveRoute(routeData);}}
+          onRouteLoaded={(routeData) => { setRemainingRoute(routeData); setLiveRoute(routeData); }}
         />
         {currentStatus === TRIP_STATUS.IN_PROGRESS && remainingRoute ? (
           <View style={styles.remainingBadge}>
@@ -535,6 +535,21 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.text,
+    fontWeight: '700',
+  },
+  remainingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  remainingText: {
+    color: colors.primary,
+    fontSize: 13,
     fontWeight: '700',
   },
 });
