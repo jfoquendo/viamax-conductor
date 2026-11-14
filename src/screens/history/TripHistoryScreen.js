@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import useTripHistory, { HISTORY_FILTERS } from '../../hooks/useTripHistory';
+import DateField from '../../components/forms/DateField';
+import { CATEGORY_LABELS } from '../../config/pricing';
 import TripMapCard from '../../components/maps/TripMapCard';
 import { PAYMENT_METHOD_LABELS, TRIP_STATUS, TRIP_STATUS_LABELS } from '../../config/trips';
 import { colors, radius, spacing, typography, shadows } from '../../theme';
@@ -116,6 +118,24 @@ function TripRow({ trip, expanded, onToggle }) {
           ) : null}
 
           <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Duración</Text>
+            <Text style={styles.detailValue}>
+              {trip.durationMin ?? '—'} min
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Categoría</Text>
+            <Text style={styles.detailValue}>
+              {CATEGORY_LABELS[trip.category] ?? trip.category ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Estado del pago</Text>
+            <Text style={styles.detailValue}>
+              {trip.status === TRIP_STATUS.PAID ? 'Pagado' : 'Pendiente'}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Tarifa</Text>
             <Text style={styles.detailValue}>{formatCOP(trip.fare)}</Text>
           </View>
@@ -142,13 +162,89 @@ function TripRow({ trip, expanded, onToggle }) {
 export default function TripHistoryScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { trips, totals, filter, setFilter, isLoading, error } = useTripHistory(user?.uid);
+  const {
+    trips,
+    totals,
+    filter,
+    setFilter,
+    paymentFilter,
+    setPaymentFilter,
+    isLoading,
+    error,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+  } = useTripHistory(user?.uid);
   const [expandedId, setExpandedId] = useState(null);
 
   const header = useMemo(
     () => (
       <View>
         <FilterBar filter={filter} onChange={setFilter} />
+        <View style={styles.paymentFilterRow}>
+          {[
+            ['all', 'Todos'],
+            ['cash', 'Efectivo'],
+            ['card', 'Tarjeta'],
+          ].map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.paymentFilterChip,
+                paymentFilter === key && styles.paymentFilterChipActive,
+              ]}
+              onPress={() => setPaymentFilter(key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: paymentFilter === key }}
+            >
+              <Text
+                style={[
+                  styles.paymentFilterText,
+                  paymentFilter === key && styles.paymentFilterTextActive,
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.dateRange}>
+          <View style={styles.dateRangeField}>
+            <DateField
+              label="Desde"
+              value={dateFrom}
+              onChange={setDateFrom}
+              maximumDate={dateTo ? new Date(`${dateTo}T12:00:00`) : new Date()}
+            />
+          </View>
+
+          <View style={styles.dateRangeField}>
+            <DateField
+              label="Hasta"
+              value={dateTo}
+              onChange={setDateTo}
+              minimumDate={dateFrom ? new Date(`${dateFrom}T12:00:00`) : undefined}
+              maximumDate={new Date()}
+            />
+          </View>
+        </View>
+        {dateFrom || dateTo ? (
+          <TouchableOpacity
+            style={styles.clearDateButton}
+            onPress={() => {
+              setDateFrom('');
+              setDateTo('');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Limpiar rango de fechas"
+          >
+            <Text style={styles.clearDateText}>Reestablecer</Text>
+          </TouchableOpacity>
+        ) : null}
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{totals.count}</Text>
@@ -169,7 +265,7 @@ export default function TripHistoryScreen() {
         </View>
       </View>
     ),
-    [filter, totals]
+    [filter, paymentFilter, dateFrom, dateTo, totals]
   );
 
   if (isLoading) {
@@ -208,6 +304,23 @@ export default function TripHistoryScreen() {
             {error ?? 'Los viajes que completes aparecerán aquí.'}
           </Text>
         </View>
+      }
+      ListFooterComponent={
+        hasMore ? (
+          <TouchableOpacity
+            style={styles.loadMoreButton}
+            onPress={loadMore}
+            disabled={isLoadingMore}
+            accessibilityRole="button"
+            accessibilityLabel="Cargar más viajes"
+          >
+            {isLoadingMore ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={styles.loadMoreText}>Cargar más</Text>
+            )}
+          </TouchableOpacity>
+        ) : null
       }
       showsVerticalScrollIndicator={false}
     />
@@ -256,6 +369,55 @@ const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: colors.primary,
+  },
+  paymentFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  paymentFilterChip: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.cardBackground,
+    alignItems: 'center',
+  },
+  paymentFilterChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  paymentFilterText: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  paymentFilterTextActive: {
+    color: colors.primary,
+  },
+  dateRange: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  dateRangeField: {
+    flex: 1,
+  },
+  clearDateButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.md,
+  },
+  clearDateText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
   },
   summary: {
     flexDirection: 'row',
@@ -402,5 +564,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
+  },
+  loadMoreButton: {
+    alignSelf: 'center',
+    minWidth: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  loadMoreText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

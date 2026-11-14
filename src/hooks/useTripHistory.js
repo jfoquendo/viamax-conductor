@@ -32,6 +32,24 @@ function tripDate(trip) {
   return toDate(trip.completedAt) ?? toDate(trip.paidAt) ?? toDate(trip.requestedAt);
 }
 
+// Convierte una fecha YYYY-MM-DD del filtro en una fecha local.
+function filterDate(value, endOfDay = false) {
+  if (!value) return null;
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  } else {
+    date.setHours(0, 0, 0, 0);
+  }
+
+  return date;
+}
+
 function filterStart(filter, now = new Date()) {
   switch (filter) {
     case 'today':
@@ -58,37 +76,99 @@ export default function useTripHistory(driverId) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [lastDocument, setLastDocument] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!driverId) {
       setIsLoading(false);
-      return () => {};
+      return () => { };
     }
 
-    setIsLoading(true);
-    return tripSource.subscribeHistory(
-      driverId,
-      (data) => {
-        setTrips(Array.isArray(data) ? data : []);
-        setIsLoading(false);
-        setError(null);
-      },
-      (subscriptionError) => {
-        setError(subscriptionError?.message ?? 'No se pudo cargar el historial');
-        setIsLoading(false);
+    let cancelled = false;
+
+    const loadInitialPage = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const page = await tripSource.fetchHistoryPage(driverId);
+
+        if (cancelled) return;
+
+        setTrips(page.trips);
+        setLastDocument(page.lastDocument);
+        setHasMore(page.hasMore);
+      } catch (loadError) {
+        if (cancelled) return;
+
+        setError(
+          loadError?.message ?? 'No se pudo cargar el historial'
+        );
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-    );
+    };
+
+    loadInitialPage();
+
+    return () => {
+      cancelled = true;
+    };
   }, [driverId]);
+
+  const loadMore = async () => {
+    if (!driverId || !hasMore || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+
+    try {
+      const page = await tripSource.fetchHistoryPage(
+        driverId,
+        lastDocument
+      );
+
+      setTrips((current) => {
+        const existingIds = new Set(current.map((trip) => trip.id));
+        const newTrips = page.trips.filter(
+          (trip) => !existingIds.has(trip.id)
+        );
+
+        return [...current, ...newTrips];
+      });
+
+      setLastDocument(page.lastDocument);
+      setHasMore(page.hasMore);
+    } catch (loadError) {
+      setError(
+        loadError?.message ?? 'No se pudieron cargar más viajes'
+      );
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const from = filterStart(filter);
-    if (!from) return trips;
+    const customFrom = filterDate(dateFrom);
+    const customTo = filterDate(dateTo, true);
 
     return trips.filter((trip) => {
       const when = tripDate(trip);
-      return when && when >= from;
+      const matchesDate = !from || (when && when >= from);
+      const matchesCustomRange =
+        (!customFrom || (when && when >= customFrom)) &&
+        (!customTo || (when && when <= customTo));
+      const matchesPayment = paymentFilter === 'all' || trip.paymentMethod === paymentFilter;
+      return matchesDate && matchesCustomRange && matchesPayment;
     });
-  }, [trips, filter]);
+  }, [trips, filter, paymentFilter, dateFrom, dateTo]);
 
   const totals = useMemo(() => {
     return filtered.reduce(
@@ -102,5 +182,19 @@ export default function useTripHistory(driverId) {
     );
   }, [filtered]);
 
-  return { trips: filtered, totals, filter, setFilter, isLoading, error };
+  return { 
+    trips: filtered,
+    totals, filter,
+    setFilter,
+    paymentFilter,
+    setPaymentFilter,
+    isLoading,
+    error,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    loadMore,
+    hasMore,
+    isLoadingMore };
 }

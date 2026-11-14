@@ -12,6 +12,8 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  getDocs,
+  startAfter,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
 import { TRIP_STATUS } from '../config/trips';
@@ -28,7 +30,7 @@ const firestoreSource = {
 
   // Escucha las solicitudes pendientes más recientes.
   subscribePending(onData, onError) {
-    if (!isFirebaseConfigured || !db) return () => {};
+    if (!isFirebaseConfigured || !db) return () => { };
 
     const q = query(
       collection(db, TRIPS_COLLECTION),
@@ -76,7 +78,7 @@ const firestoreSource = {
   subscribeHistory(driverId, onData, onError) {
     if (!isFirebaseConfigured || !db || !driverId) {
       onData([]);
-      return () => {};
+      return () => { };
     }
 
     const q = query(
@@ -92,6 +94,44 @@ const firestoreSource = {
       (snapshot) => onData(snapshot.docs.map(toTrip)),
       (error) => onError?.(error)
     );
+  },
+
+  // Carga el historial por paginas de 20 viajes.
+  async fetchHistoryPage(driverId, lastDocument = null) {
+    if (!isFirebaseConfigured || !db || !driverId) {
+      return {
+        trips: [],
+        lastDocument: null,
+        hasMore: false,
+      };
+    }
+
+    const constraints = [
+      where('driverId', '==', driverId),
+      where('status', 'in', [TRIP_STATUS.COMPLETED, TRIP_STATUS.PAID]),
+      orderBy('completedAt', 'desc'),
+    ];
+
+    if (lastDocument) {
+      constraints.push(startAfter(lastDocument));
+    }
+
+    constraints.push(limit(20));
+
+    const snapshot = await getDocs(
+      query(collection(db, TRIPS_COLLECTION), ...constraints)
+    );
+
+    const lastDoc =
+      snapshot.docs.length > 0
+        ? snapshot.docs[snapshot.docs.length - 1]
+        : null;
+
+    return {
+      trips: snapshot.docs.map(toTrip),
+      lastDocument: lastDoc,
+      hasMore: snapshot.docs.length === 20,
+    };
   },
 
   async accept(tripId, driverId) {
