@@ -1,6 +1,6 @@
 // Perfil del conductor con datos reales de la cuenta.
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { CATEGORY_LABELS } from '../../config/pricing';
@@ -33,7 +33,7 @@ export default function DriverProfileScreen() {
       {
         text: 'Cerrar sesión',
         style: 'destructive',
-        onPress: () => logout().catch(() => {}),
+        onPress: () => logout().catch(() => { }),
       },
     ]);
   };
@@ -46,7 +46,14 @@ export default function DriverProfileScreen() {
     >
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={36} color={colors.primary} />
+          {personal.profilePhoto ? (
+            <Image
+              source={{ uri: personal.profilePhoto }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Ionicons name="person" size={36} color={colors.primary} />
+          )}
         </View>
         <Text style={styles.name}>{personal.fullName || 'Conductor ViaMax'}</Text>
         <Text style={styles.email}>{user?.email || personal.email || ''}</Text>
@@ -120,6 +127,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 42,
   },
   name: {
     ...typography.subtitle,
