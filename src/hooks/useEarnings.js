@@ -38,13 +38,38 @@ function toDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-// Suma los viajes pagados dentro de un rango.
-function sumBetween(trips, from, to = new Date()) {
-  return trips.reduce((total, trip) => {
+// Resume los viajes de un periodo: facturación, comisión,
+// propinas, ganancia neta y promedio por viaje.
+function summarizeBetween(trips, from, to = new Date()) {
+  const filtered = trips.filter((trip) => {
     const when = toDate(trip.completedAt) ?? toDate(trip.requestedAt);
-    if (!when || when < from || when > to) return total;
-    return total + (Number(trip.driverEarnings) || 0);
-  }, 0);
+    return when && when >= from && when <= to;
+  });
+
+  const totals = filtered.reduce(
+    (acc, trip) => {
+      acc.billed += Number(trip.fare) || 0;
+      acc.commission += Number(trip.commission) || 0;
+      acc.tips += Number(trip.tip) || 0;
+      acc.amount += Number(trip.driverEarnings) || 0;
+      return acc;
+    },
+    {
+      billed: 0,
+      commission: 0,
+      tips: 0,
+      amount: 0,
+    }
+  );
+
+  return {
+    trips: filtered.length,
+    billed: totals.billed,
+    commission: totals.commission,
+    tips: totals.tips,
+    amount: totals.amount,
+    average: filtered.length ? totals.amount / filtered.length : 0,
+  };
 }
 
 // Ganancias del conductor y saldo pendiente de liquidación.
@@ -56,7 +81,7 @@ export default function useEarnings(driverId) {
   useEffect(() => {
     if (!isFirebaseConfigured || !db || !driverId) {
       setIsLoading(false);
-      return () => {};
+      return () => { };
     }
 
     setIsLoading(true);
@@ -87,11 +112,6 @@ export default function useEarnings(driverId) {
     const week = startOfWeek(now);
     const month = startOfMonth(now);
 
-    const todayTrips = trips.filter((trip) => {
-      const when = toDate(trip.completedAt) ?? toDate(trip.requestedAt);
-      return when && when >= today;
-    });
-
     // Saldo: lo cobrado por tarjeta queda pendiente de liquidación;
     // lo cobrado en efectivo ya está en manos del conductor y solo
     // se descuenta la comisión que le debe a la plataforma.
@@ -105,24 +125,9 @@ export default function useEarnings(driverId) {
     }, 0);
 
     return {
-      today: {
-        trips: todayTrips.length,
-        amount: sumBetween(trips, today),
-      },
-      week: {
-        trips: trips.filter((trip) => {
-          const when = toDate(trip.completedAt) ?? toDate(trip.requestedAt);
-          return when && when >= week;
-        }).length,
-        amount: sumBetween(trips, week),
-      },
-      month: {
-        trips: trips.filter((trip) => {
-          const when = toDate(trip.completedAt) ?? toDate(trip.requestedAt);
-          return when && when >= month;
-        }).length,
-        amount: sumBetween(trips, month),
-      },
+      today: summarizeBetween(trips, today),
+      week: summarizeBetween(trips, week),
+      month: summarizeBetween(trips, month),
       pendingBalance,
     };
   }, [trips]);

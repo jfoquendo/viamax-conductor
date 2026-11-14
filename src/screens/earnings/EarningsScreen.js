@@ -1,5 +1,5 @@
 // Pantalla de ganancias del conductor: resumen por periodo y saldo.
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -20,7 +20,7 @@ const formatCOP = (value) => {
   return sign + '$' + Math.abs(rounded).toLocaleString('es-CO') + ' COP';
 };
 
-function PeriodCard({ icon, label, amount, trips, highlight }) {
+function PeriodCard({ icon, label, amount, trips, billed, commission, tips, average, highlight }) {
   return (
     <View style={[styles.periodCard, highlight && styles.periodCardHighlight]}>
       <View style={styles.periodHeader}>
@@ -33,6 +33,23 @@ function PeriodCard({ icon, label, amount, trips, highlight }) {
       <Text style={styles.periodTrips}>
         {trips} {trips === 1 ? 'viaje' : 'viajes'}
       </Text>
+      <View style={styles.periodDetails}>
+        <Text style={styles.periodDetailText}>
+          Facturado: {formatCOP(billed)}
+        </Text>
+
+        <Text style={styles.periodDetailText}>
+          Comisión: {formatCOP(commission)}
+        </Text>
+
+        <Text style={styles.periodDetailText}>
+          Propinas: {formatCOP(tips)}
+        </Text>
+
+        <Text style={styles.periodDetailText}>
+          Promedio: {formatCOP(average)}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -41,12 +58,6 @@ export default function EarningsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { trips, summary, isLoading, error } = useEarnings(user?.uid);
-
-  const average = useMemo(() => {
-    const month = summary?.month;
-    if (!month || !month.trips) return 0;
-    return month.amount / month.trips;
-  }, [summary]);
 
   if (isLoading) {
     return (
@@ -61,7 +72,7 @@ export default function EarningsScreen() {
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => {}} tintColor={colors.primary} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={() => { }} tintColor={colors.primary} />}
     >
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Saldo pendiente</Text>
@@ -82,12 +93,20 @@ export default function EarningsScreen() {
           label="Hoy"
           amount={summary?.today?.amount ?? 0}
           trips={summary?.today?.trips ?? 0}
+          billed={summary?.today?.billed ?? 0}
+          commission={summary?.today?.commission ?? 0}
+          tips={summary?.today?.tips ?? 0}
+          average={summary?.today?.average ?? 0}
         />
         <PeriodCard
           icon="calendar-outline"
           label="Semana"
           amount={summary?.week?.amount ?? 0}
           trips={summary?.week?.trips ?? 0}
+          billed={summary?.week?.billed ?? 0}
+          commission={summary?.week?.commission ?? 0}
+          tips={summary?.week?.tips ?? 0}
+          average={summary?.week?.average ?? 0}
         />
       </View>
 
@@ -97,13 +116,11 @@ export default function EarningsScreen() {
           label="Mes"
           amount={summary?.month?.amount ?? 0}
           trips={summary?.month?.trips ?? 0}
+          billed={summary?.month?.billed ?? 0}
+          commission={summary?.month?.commission ?? 0}
+          tips={summary?.month?.tips ?? 0}
+          average={summary?.month?.average ?? 0}
           highlight
-        />
-        <PeriodCard
-          icon="analytics-outline"
-          label="Promedio por viaje"
-          amount={average}
-          trips={summary?.month?.trips ?? 0}
         />
       </View>
 
@@ -234,6 +251,18 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 11,
     marginTop: 2,
+  },
+  periodDetails: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 3,
+  },
+  periodDetailText: {
+    color: colors.textSoft,
+    fontSize: 10,
+    lineHeight: 14,
   },
   errorBox: {
     flexDirection: 'row',
