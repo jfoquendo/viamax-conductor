@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useActiveTrip } from '../../context/ActiveTripContext';
 import useDriverLocation from '../../hooks/useDriverLocation';
+import { serverTimestamp } from 'firebase/firestore';
 import { tripSource } from '../../services/tripService';
 import { calculateFare } from '../../utils/calculateFare';
 import {
@@ -126,22 +127,29 @@ export default function TripActiveScreen({ navigation }) {
 
   const advance = useCallback(async () => {
     if (!next || !trip) return;
-
     setIsWorking(true);
     setError(null);
+
     try {
 
       if (next.status === TRIP_STATUS.COMPLETED) {
-        // Se guardan los montos y la fecha de cierre para que el historial
-        // y las ganancias tengan de dónde leer.
+        // Se cierran los montos aqui para que el historial y las ganancias
+        // tengan de donde leer, usando la distancia real de la ruta.
         const distanceKm = liveRoute?.distanceKm ?? trip.distanceKm;
         const durationMin = liveRoute?.durationMin ?? trip.durationMin;
-        const closingFare = fare ?? calculateFare({ distanceKm, durationMin, category: trip.category ?? category, tip: trip.tip ?? 0 });
+        const closingFare =
+          fare ??
+          calculateFare({
+            distanceKm,
+            durationMin,
+            category: trip.category ?? category,
+            tip: trip.tip ?? 0,
+          });
 
         await tripSource.advance(trip.id, next.status, {
           distanceKm,
           durationMin,
-          completedAt: new Date().toISOString(),
+          completedAt: serverTimestamp(),
           fare: closingFare.fare,
           commission: closingFare.commission,
           driverEarnings: closingFare.driverEarnings,
@@ -150,14 +158,11 @@ export default function TripActiveScreen({ navigation }) {
           total: closingFare.total,
         });
 
-        const updated = { ...trip, status: next.status, driverEarnings: closingFare.driverEarnings };
-        setTrip(updated);
         navigation?.replace?.('TripSummary', { tripId: trip.id, fare: closingFare });
         return;
       }
 
       await tripSource.advance(trip.id, next.status);
-      setTrip({ ...trip, status: next.status });
     } catch (advanceError) {
       setError(advanceError?.message ?? 'No se pudo actualizar el viaje');
     } finally {

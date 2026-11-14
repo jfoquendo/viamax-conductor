@@ -98,6 +98,8 @@ service cloud.firestore {
       // Los montos se escriben una sola vez, al cerrar el viaje.
       function validTransition() {
         return request.resource.data.diff(resource.data).affectedKeys()
+          // Los montos y las fechas de cierre se escriben una sola vez,
+          // al finalizar y al cobrar el viaje.
           .hasOnly([
             'status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy',
             'completedAt', 'paidAt', 'distanceKm', 'durationMin',
@@ -107,7 +109,7 @@ service cloud.firestore {
 
       function allowedStatus() {
         return request.resource.data.status in
-          ['accepted', 'cancelled', 'driver_arriving', 'in_progress', 'completed'];
+          ['accepted', 'cancelled', 'driver_arriving', 'in_progress', 'completed', 'paid'];
       }
 
       // Un conductor puede ver solicitudes pendientes o sus propios viajes.
