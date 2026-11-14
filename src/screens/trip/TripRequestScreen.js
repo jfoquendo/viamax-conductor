@@ -16,8 +16,6 @@ const formatCOP = (value) =>
 export default function TripRequestScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const isDemo = tripSource.name === 'local';
-  const [simulated, setSimulated] = useState(null);
   const [routeData, setRouteData] = useState(null);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [routeWarning, setRouteWarning] = useState(null);
@@ -43,15 +41,6 @@ export default function TripRequestScreen({ navigation }) {
     }
   }, [accept, navigation]);
 
-  const handleSimulate = () => {
-    if (isDemo && typeof tripSource.simulateIncoming === 'function') {
-      setSimulated(tripSource.simulateIncoming());
-    }
-  };
-
-  useEffect(() => {
-    if (!request) setSimulated(null);
-  }, [request]);
   useEffect(() => {
     let cancelled = false;
 
@@ -118,13 +107,6 @@ export default function TripRequestScreen({ navigation }) {
         <Text style={styles.emptyText}>
           Mantén el turno activo en la pantalla principal para recibir viajes cercanos.
         </Text>
-
-        {isDemo ? (
-          <TouchableOpacity style={styles.demoButton} onPress={handleSimulate}>
-            <Ionicons name="flask-outline" size={18} color={colors.warning} />
-            <Text style={styles.demoText}>Simular solicitud (modo local)</Text>
-          </TouchableOpacity>
-        ) : null}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
@@ -236,11 +218,6 @@ export default function TripRequestScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {simulated ? (
-        <Text style={styles.demoNote}>
-          Solicitud simulada localmente. Se conectará a la API del curso cuando esté disponible.
-        </Text>
-      ) : null}
     </View>
   );
 }
