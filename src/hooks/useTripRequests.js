@@ -79,15 +79,9 @@ export default function useTripRequests({ enabled = true, driverId = null } = {}
     if (!request || isResponding) return;
     setIsResponding(true);
     setError(null);
-    try {
-      await tripSource.reject(request.id);
       dismissedRef.current.add(request.id);
       setRequest(null);
-    } catch (rejectError) {
-      setError(rejectError?.message ?? 'No se pudo rechazar el viaje');
-    } finally {
       setIsResponding(false);
-    }
   }, [request, isResponding]);
 
   const progress = request ? secondsLeft / REQUEST_TIMEOUT_SECONDS : 0;
