@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import useEarnings from '../../hooks/useEarnings';
+import { PAYMENT_METHOD_LABELS } from '../../config/trips';
 import { colors, radius, spacing, typography, shadows } from '../../theme';
 
 const formatCOP = (value) => {
@@ -152,7 +153,7 @@ export default function EarningsScreen() {
                   {trip.destination?.address ?? 'Viaje'}
                 </Text>
                 <Text style={styles.rowSubtitle}>
-                  {trip.distanceKm ?? '—'} km · {trip.paymentMethod === 'cash' ? 'Efectivo' : 'Tarjeta'}
+                  {PAYMENT_METHOD_LABELS[trip.paymentMethod] ?? 'Método no disponible'}
                 </Text>
               </View>
               <Text style={styles.rowAmount}>{formatCOP(trip.driverEarnings)}</Text>

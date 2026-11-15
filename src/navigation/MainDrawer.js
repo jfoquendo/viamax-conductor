@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
@@ -25,6 +25,7 @@ function CustomDrawerContent(props) {
 
   const fullName = profile?.personal?.fullName ?? 'Conductor ViaMax';
   const email = user?.email ?? profile?.email ?? '';
+  const profilePhoto = profile?.personal?.profilePhoto;
   const vehicle = [profile?.vehicle?.brand, profile?.vehicle?.model]
     .filter(Boolean)
     .join(' ');
@@ -52,7 +53,16 @@ function CustomDrawerContent(props) {
       <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerScroll}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials || 'V'}</Text>
+            {profilePhoto ? (
+              <Image
+                source={{ uri: profilePhoto }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {initials || 'V'}
+              </Text>
+            )}
           </View>
           <Text style={styles.name} numberOfLines={1}>
             {fullName}
@@ -243,6 +253,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
   },
   avatarText: {
     color: colors.primary,
