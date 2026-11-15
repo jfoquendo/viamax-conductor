@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { serverTimestamp } from 'firebase/firestore';
 import { tripSource } from '../../services/tripService';
+import {
+  checkTripPaymentStatus,
+  createPaymentPreference,
+} from '../../services/paymentService';
 import { calculateFare } from '../../utils/calculateFare';
 import { PAYMENT_METHOD_LABELS, TRIP_STATUS } from '../../config/trips';
 import { colors, radius, spacing, typography, shadows } from '../../theme';
@@ -28,6 +34,7 @@ export default function TripSummaryScreen({ route, navigation }) {
   const [isLoading, setIsLoading] = useState(!fareFromRoute);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
+  const [isPayPending, setIsPayPending] = useState(false);
 
   const category = profile?.vehicle?.category ?? 'economy';
 
@@ -62,6 +69,58 @@ export default function TripSummaryScreen({ route, navigation }) {
       tip: trip.tip ?? 0,
     });
   }, [fareFromRoute, trip, category]);
+
+  // Al volver del navegador del checkout, pregunta al backend si el pago
+  // se aprobo. Cubre el caso en que el webhook no llegue al servidor local.
+  useEffect(() => {
+    if (!isPayPending || !tripId) return () => {};
+
+    let cancelled = false;
+
+    const checkStatus = async () => {
+      const result = await checkTripPaymentStatus(tripId);
+      if (cancelled || !result?.paid) return;
+
+      setIsPayPending(false);
+      navigation?.reset?.({ index: 0, routes: [{ name: 'MainDrawer' }] });
+    };
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkStatus();
+      }
+    });
+
+    // Tambien consulta de inmediato por si la app nunca perdio el foco.
+    checkStatus();
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, [isPayPending, tripId, navigation]);
+
+  // Abre el checkout de Mercado Pago. El webhook marca el viaje como pagado
+  // y la app sale sola cuando el estado cambia en Firestore.
+  const payWithCard = async () => {
+    if (!tripId || isWorking) return;
+
+    setIsWorking(true);
+    setError(null);
+    try {
+      const { initPoint } = await createPaymentPreference(tripId);
+      const supported = await Linking.canOpenURL(initPoint);
+      if (!supported) {
+        throw new Error('No se pudo abrir el navegador para el pago');
+      }
+      setIsPayPending(true);
+      await Linking.openURL(initPoint);
+    } catch (paymentError) {
+      setError(paymentError?.message ?? 'No se pudo iniciar el pago');
+    } finally {
+      setIsWorking(false);
+    }
+  };
 
   const close = async () => {
     setIsWorking(true);
@@ -179,17 +238,37 @@ export default function TripSummaryScreen({ route, navigation }) {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        {isPayPending ? (
+          <View style={styles.waitingBox}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.waitingText}>
+              Esperando confirmación del pago con tarjeta…
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.cardButton}
+            onPress={payWithCard}
+            disabled={isWorking}
+            accessibilityRole="button"
+            accessibilityLabel="Pagar con tarjeta"
+          >
+            <Ionicons name="card-outline" size={20} color={colors.textInverse} />
+            <Text style={styles.cardButtonText}>Pagar con tarjeta</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.button}
           onPress={close}
           disabled={isWorking}
           accessibilityRole="button"
-          accessibilityLabel="Volver al inicio"
+          accessibilityLabel="Cobrar en efectivo"
         >
           {isWorking ? (
             <ActivityIndicator color={colors.textInverse} />
           ) : (
-            <Text style={styles.buttonText}>Volver al inicio</Text>
+            <Text style={styles.buttonText}>Cobrar en efectivo</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -284,6 +363,40 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingTop: spacing.md,
+  },
+  waitingBox: {
+    height: 56,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  waitingText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  cardButton: {
+    height: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  cardButtonText: {
+    color: colors.textInverse,
+    fontSize: 16,
+    fontWeight: '800',
   },
   button: {
     height: 56,
