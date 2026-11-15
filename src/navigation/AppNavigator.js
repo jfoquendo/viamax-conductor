@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,27 @@ function Splash() {
 
 function DriverNavigator() {
   const { activeTrip, isLoading } = useActiveTrip();
+  const navigationRef = useRef(null);
+
+  // El Drawer siempre vive en el stack. Cuando aparece un viaje activo se
+  // monta TripActive encima; al terminar, se cierra y el conductor vuelve
+  // al menu sin perder la sesion.
+  useEffect(() => {
+    if (isLoading) return;
+
+    const nav = navigationRef.current;
+    if (!nav) return;
+
+    const current = nav.getCurrentRoute()?.name;
+
+    if (activeTrip && current !== 'TripActive' && current !== 'TripSummary') {
+      nav.navigate('TripActive', { tripId: activeTrip.id });
+    }
+
+    if (!activeTrip && (current === 'TripActive' || current === 'TripSummary')) {
+      nav.navigate('MainDrawer');
+    }
+  }, [activeTrip, isLoading]);
 
   if (isLoading) {
     return <Splash />;
@@ -37,7 +58,8 @@ function DriverNavigator() {
 
   return (
     <Stack.Navigator
-      initialRouteName={activeTrip ? 'TripActive' : 'MainDrawer'}
+      ref={navigationRef}
+      initialRouteName="MainDrawer"
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen
@@ -48,14 +70,10 @@ function DriverNavigator() {
       <Stack.Screen
         name="TripActive"
         component={TripActiveScreen}
-        initialParams={
-          activeTrip
-            ? { tripId: activeTrip.id }
-            : undefined
-        }
         options={{
-          presentation: 'fullScreenModal',
+          presentation: 'card',
           gestureEnabled: false,
+          animation: 'slide_from_bottom',
         }}
       />
 

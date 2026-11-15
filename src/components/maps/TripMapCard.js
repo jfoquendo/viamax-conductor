@@ -39,6 +39,7 @@ export default function TripMapCard({
   driverLocation,
   height = 240,
   onRouteLoaded,
+  navigationMode = false,
 }) {
   const mapRef = useRef(null);
   const [route, setRoute] = useState(null);
@@ -93,9 +94,32 @@ export default function TripMapCard({
     }
   }, [route]);
 
+  // En modo navegacion la camara sigue al conductor en lugar de encuadrar
+  // toda la ruta: vista inclinada, orientada al rumbo de avance.
+  const followDriver = useCallback(() => {
+    if (!mapRef.current || !driverLocation?.latitude) return;
+
+    mapRef.current.animateCamera(
+      {
+        center: {
+          latitude: driverLocation.latitude,
+          longitude: driverLocation.longitude,
+        },
+        pitch: 45,
+        heading: driverLocation.heading || 0,
+        zoom: 17,
+      },
+      { duration: 800 }
+    );
+  }, [driverLocation?.latitude, driverLocation?.longitude, driverLocation?.heading]);
+
   useEffect(() => {
+    if (navigationMode) {
+      followDriver();
+      return;
+    }
     fitToRoute();
-  }, [fitToRoute]);
+  }, [navigationMode, followDriver, fitToRoute]);
 
   return (
     <View style={[styles.container, { height }]}>
@@ -118,7 +142,21 @@ export default function TripMapCard({
           />
         ) : null}
 
-        {origin ? (
+        {navigationMode && driverLocation?.latitude ? (
+          <Marker
+            coordinate={{
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+            }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            flat
+            rotation={driverLocation.heading || 0}
+          >
+            <View style={styles.markerVehicle}>
+              <Ionicons name="navigate" size={16} color={colors.textInverse} />
+            </View>
+          </Marker>
+        ) : origin ? (
           <Marker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }}>
             <View style={styles.markerOrigin} />
           </Marker>
@@ -168,6 +206,16 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
+  },
+  markerVehicle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.textInverse,
   },
   markerOrigin: {
     width: 14,

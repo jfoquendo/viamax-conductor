@@ -111,6 +111,7 @@ service cloud.firestore {
             'status', 'driverId', 'acceptedAt', 'updatedAt', 'cancelledAt', 'cancelledBy',
             'completedAt', 'paidAt', 'distanceKm', 'durationMin',
             'fare', 'commission', 'driverEarnings', 'commissionRate', 'tip', 'total',
+            'skippedBy',
           ]);
       }
 

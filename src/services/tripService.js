@@ -2,6 +2,7 @@
 // La fuente de datos está detrás de un adaptador para poder cambiar de
 // Firestore a la API del curso sin tocar las pantallas ni los hooks.
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
@@ -163,6 +164,24 @@ const firestoreSource = {
     const snapshot = await getDoc(doc(db, TRIPS_COLLECTION, tripId));
     return snapshot.exists() ? toTrip(snapshot) : null;
   },
+
+  // Marca que este conductor descarto la solicitud sin cancelarla globalmente.
+  // El viaje sigue disponible para otros conductores o para el dispatch.
+  async skipRequest(tripId, driverId) {
+    if (!isFirebaseConfigured || !db || !tripId || !driverId) return;
+
+    const ref = doc(db, TRIPS_COLLECTION, tripId);
+
+    // arrayUnion evita leer y reescribir: dos conductores pueden descartar
+    // la misma solicitud sin pisarse.
+    await updateDoc(ref, {
+      skippedBy: arrayUnion(driverId),
+      updatedAt: serverTimestamp(),
+    }).catch(() => {
+      // Si el viaje ya no existe o no es escribible, se ignora en silencio.
+    });
+  },
+
 };
 
 // Fuente de datos de viajes: Firestore.
