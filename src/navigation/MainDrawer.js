@@ -5,7 +5,7 @@ import {
   DrawerContentScrollView,
   DrawerItemList,
 } from '@react-navigation/drawer';
-import { useNavigationState } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DriverHomeScreen from '../screens/home/DriverHomeScreen';
@@ -15,6 +15,7 @@ import DriverProfileScreen from '../screens/profile/DriverProfileScreen';
 import TripRequestScreen from '../screens/trip/TripRequestScreen';
 import { useAuth } from '../context/AuthContext';
 import { TripRequestsProvider, useTripRequestsContext } from '../context/TripRequestsContext';
+import { useActiveTrip } from '../context/ActiveTripContext';
 import { colors, radius, spacing, typography, shadows } from '../theme';
 
 const Drawer = createDrawerNavigator();
@@ -69,6 +70,8 @@ function CustomDrawerContent(props) {
           </View>
         </View>
 
+        <ActiveTripEntry navigation={props.navigation} />
+
         <View style={styles.items}>
           <DrawerItemList {...props} />
         </View>
@@ -84,6 +87,38 @@ function CustomDrawerContent(props) {
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+function ActiveTripEntry({ navigation }) {
+  const { activeTrip } = useActiveTrip();
+  const rootNavigation = useNavigation();
+
+  if (!activeTrip) return null;
+
+  const destination = activeTrip.destination?.address ?? 'Viaje en curso';
+
+  return (
+    <TouchableOpacity
+      style={styles.activeTripEntry}
+      onPress={() => {
+        // Se navega en el Stack raíz, no en el Drawer.
+        const parent = navigation.getParent?.();
+        (parent ?? rootNavigation).navigate('TripActive', { tripId: activeTrip.id });
+        navigation.closeDrawer?.();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Volver al viaje en curso"
+    >
+      <Ionicons name="navigate" size={20} color={colors.textInverse} />
+      <View style={styles.activeTripBody}>
+        <Text style={styles.activeTripTitle}>Viaje en curso</Text>
+        <Text style={styles.activeTripSubtitle} numberOfLines={1}>
+          {destination}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textInverse} />
+    </TouchableOpacity>
   );
 }
 
@@ -285,6 +320,31 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 11,
     fontWeight: '700',
+  },
+  activeTripEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  activeTripBody: {
+    flex: 1,
+  },
+  activeTripTitle: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  activeTripSubtitle: {
+    color: colors.textInverse,
+    fontSize: 11,
+    opacity: 0.85,
+    marginTop: 2,
   },
   items: {
     paddingTop: spacing.sm,

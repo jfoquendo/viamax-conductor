@@ -23,6 +23,7 @@ export default function TripRequestScreen({ navigation }) {
   const {
     request,
     requests,
+    recentRequests,
     pendingCount,
     secondsLeft,
     progress,
@@ -107,34 +108,61 @@ export default function TripRequestScreen({ navigation }) {
     };
   }, [request?.id]);
 
-  // Bandeja de solicitudes: la activa con acciones y el resto en espera.
+  // Solicitudes disponibles ademas de la activa.
+  const otherAvailable = requests.filter((item) => item.id !== request?.id);
+
   const queueList =
-    requests.length > 1 ? (
+    otherAvailable.length > 0 ? (
       <View style={styles.queueList}>
         <Text style={styles.queueTitle}>
-          {pendingCount} solicitudes disponibles
+          {pendingCount} {pendingCount === 1 ? 'solicitud disponible' : 'solicitudes disponibles'}
         </Text>
-        {requests
-          .filter((item) => item.id !== request?.id)
-          .map((item) => {
-            const left = secondsFor(item.id);
-            return (
-              <View key={item.id} style={styles.queueItem}>
-                <View style={styles.queueDot} />
-                <View style={styles.queueBody}>
-                  <Text style={styles.queueAddress} numberOfLines={1}>
-                    {item.origin?.address ?? 'Recogida'}
-                  </Text>
-                  <Text style={styles.queueMeta}>
-                    {item.destination?.address ?? 'Destino'}
-                  </Text>
-                </View>
-                <Text style={[styles.queueTimer, left === 0 && styles.queueTimerExpired]}>
-                  {left > 0 ? left + 's' : 'expirada'}
+        {otherAvailable.map((item) => {
+          const left = secondsFor(item.id);
+          return (
+            <View key={item.id} style={styles.queueItem}>
+              <View style={styles.queueDot} />
+              <View style={styles.queueBody}>
+                <Text style={styles.queueAddress} numberOfLines={1}>
+                  {item.origin?.address ?? 'Recogida'}
+                </Text>
+                <Text style={styles.queueMeta}>
+                  {item.destination?.address ?? 'Destino'}
                 </Text>
               </View>
-            );
-          })}
+              <Text style={[styles.queueTimer, left === 0 && styles.queueTimerExpired]}>
+                {left > 0 ? left + 's' : 'expirada'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
+
+  // Solicitudes descartadas por ti o canceladas: quedan visibles como historial.
+  const recentList =
+    recentRequests.length > 0 ? (
+      <View style={styles.queueList}>
+        <Text style={styles.queueTitle}>Recientes</Text>
+        {recentRequests.map((item) => {
+          const cancelada = item.status === TRIP_STATUS.CANCELLED;
+          return (
+            <View key={item.id} style={[styles.queueItem, styles.queueItemMuted]}>
+              <View style={[styles.queueDot, styles.queueDotMuted]} />
+              <View style={styles.queueBody}>
+                <Text style={styles.queueAddress} numberOfLines={1}>
+                  {item.origin?.address ?? 'Recogida'}
+                </Text>
+                <Text style={styles.queueMeta} numberOfLines={1}>
+                  {item.destination?.address ?? 'Destino'}
+                </Text>
+              </View>
+              <Text style={styles.queueStatus}>
+                {cancelada ? 'cancelada' : 'descartada'}
+              </Text>
+            </View>
+          );
+        })}
       </View>
     ) : null;
 
@@ -152,6 +180,7 @@ export default function TripRequestScreen({ navigation }) {
         </Text>
 
         {queueList}
+        {recentList}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
@@ -366,6 +395,19 @@ const styles = StyleSheet.create({
   },
   queueTimerExpired: {
     color: colors.textSoft,
+    fontWeight: '600',
+  },
+  queueItemMuted: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    opacity: 0.75,
+  },
+  queueDotMuted: {
+    backgroundColor: colors.textSoft,
+  },
+  queueStatus: {
+    color: colors.textSoft,
+    fontSize: 11,
     fontWeight: '600',
   },
   timerRow: {

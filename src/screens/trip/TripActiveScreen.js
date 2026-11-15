@@ -62,16 +62,55 @@ function distanceBetweenMeters(from, to) {
 export default function TripActiveScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { activeTrip: trip, isLoading, error: activeTripError } = useActiveTrip();
+  const {
+    activeTrip: trip,
+    isLoading,
+    error: activeTripError,
+    routeState,
+    setRouteState,
+  } = useActiveTrip();
   const { location: driverLocation } = useDriverLocation(true);
 
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
-  const [routeOrigin, setRouteOrigin] = useState(null);
-  const [remainingRoute, setRemainingRoute] = useState(null);
+  // La ruta vive en el contexto del viaje para sobrevivir al desmontaje
+  // de esta pantalla (por ejemplo, al abrir el menu y volver).
+  const routeOrigin = routeState?.origin ?? null;
+  const remainingRoute = routeState?.remaining ?? null;
+  const liveRoute = routeState?.live ?? null;
+
+  const setRouteOrigin = useCallback(
+    (nextOrigin) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), origin: nextOrigin }));
+    },
+    [setRouteState]
+  );
+
+  const setRemainingRoute = useCallback(
+    (nextRemaining) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), remaining: nextRemaining }));
+    },
+    [setRouteState]
+  );
+
+  const setLiveRoute = useCallback(
+    (nextLive) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), live: nextLive }));
+    },
+    [setRouteState]
+  );
+
   const lastRouteUpdateRef = useRef(0);
-  const lastRouteLocationRef = useRef(null);
-  const [liveRoute, setLiveRoute] = useState(null);
+  const lastRouteLocationRef = useRef(routeState?.origin ?? null);
+
+  // Al remontar con una ruta ya calculada, se evita pedirla de nuevo sin
+  // que el conductor se haya movido.
+  useEffect(() => {
+    if (routeState?.origin) {
+      lastRouteUpdateRef.current = Date.now();
+      lastRouteLocationRef.current = routeState.origin;
+    }
+  }, []);
 
   const category = profile?.vehicle?.category ?? 'economy';
   useEffect(() => {

@@ -8,6 +8,7 @@ import { tripSource } from '../services/tripService';
 // - Al vencer o rechazar, se registra en Firestore para que no vuelva a aparecer.
 export default function useTripRequests({ enabled = true, driverId = null } = {}) {
   const [requests, setRequests] = useState([]);
+  const [recentRequests, setRecentRequests] = useState([]);
   const [request, setRequest] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(REQUEST_TIMEOUT_SECONDS);
   const [isResponding, setIsResponding] = useState(false);
@@ -28,20 +29,31 @@ export default function useTripRequests({ enabled = true, driverId = null } = {}
 
     const unsubscribe = tripSource.subscribePending(
       (trips) => {
-        const disponibles = (trips ?? []).filter((trip) => {
-          if (dismissedRef.current.has(trip.id)) return false;
-          const skipped = Array.isArray(trip.skippedBy) ? trip.skippedBy : [];
-          return !driverId || !skipped.includes(driverId);
-        });
+        const disponibles = [];
+        const recientes = [];
 
-        // Registra la hora de llegada de cada solicitud nueva.
-        disponibles.forEach((trip) => {
+        (trips ?? []).forEach((trip) => {
+          const skipped = Array.isArray(trip.skippedBy) ? trip.skippedBy : [];
+          const descartada =
+            dismissedRef.current.has(trip.id) ||
+            (driverId ? skipped.includes(driverId) : false);
+          const cerrada = trip.status === TRIP_STATUS.CANCELLED;
+
+          if (descartada || cerrada) {
+            recientes.push(trip);
+            return;
+          }
+
+          disponibles.push(trip);
+
+          // Registra la hora de llegada de cada solicitud nueva.
           if (!seenAtRef.current.has(trip.id)) {
             seenAtRef.current.set(trip.id, Date.now());
           }
         });
 
         setRequests(disponibles);
+        setRecentRequests(recientes.slice(0, 8));
       },
       (subscriptionError) => setError(subscriptionError?.message ?? 'Error de sincronización')
     );
@@ -138,6 +150,7 @@ export default function useTripRequests({ enabled = true, driverId = null } = {}
   return {
     request,
     requests,
+    recentRequests,
     pendingCount,
     secondsLeft,
     progress,

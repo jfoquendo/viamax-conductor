@@ -18,6 +18,10 @@ export function ActiveTripProvider({ children }) {
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Estado de la ruta del viaje en curso. Vive aqui, no en la pantalla,
+  // para que el mapa no se reinicie al navegar por el menu.
+  const [routeState, setRouteState] = useState(null);
+
   const refresh = useCallback(() => {
     setRefreshKey((current) => current + 1);
   }, []);
@@ -60,6 +64,8 @@ export function ActiveTripProvider({ children }) {
         isLoading,
         error,
         refresh,
+        routeState,
+        setRouteState,
       }}
     >
       {children}

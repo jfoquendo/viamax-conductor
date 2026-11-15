@@ -30,21 +30,55 @@ const firestoreSource = {
   name: 'firestore',
 
   // Escucha las solicitudes pendientes más recientes.
+  // Solicitudes visibles en la bandeja: las pendientes y las que se
+  // cancelaron o vencieron recientemente (para mostrar el historial).
   subscribePending(onData, onError) {
     if (!isFirebaseConfigured || !db) return () => { };
 
-    const q = query(
+    const disponibles = query(
       collection(db, TRIPS_COLLECTION),
       where('status', '==', TRIP_STATUS.REQUESTED),
       orderBy('requestedAt', 'asc'),
+      limit(20)
+    );
+
+    const cerradas = query(
+      collection(db, TRIPS_COLLECTION),
+      where('status', '==', TRIP_STATUS.CANCELLED),
+      orderBy('requestedAt', 'desc'),
       limit(10)
     );
 
-    return onSnapshot(
-      q,
-      (snapshot) => onData(snapshot.docs.map(toTrip)),
+    let actuales = [];
+    let descartadas = [];
+
+    const emitir = () => {
+      const ids = new Set(actuales.map((trip) => trip.id));
+      onData([...actuales, ...descartadas.filter((trip) => !ids.has(trip.id))]);
+    };
+
+    const unsubDisponibles = onSnapshot(
+      disponibles,
+      (snapshot) => {
+        actuales = snapshot.docs.map(toTrip);
+        emitir();
+      },
       (error) => onError?.(error)
     );
+
+    const unsubCerradas = onSnapshot(
+      cerradas,
+      (snapshot) => {
+        descartadas = snapshot.docs.map(toTrip);
+        emitir();
+      },
+      (error) => onError?.(error)
+    );
+
+    return () => {
+      unsubDisponibles();
+      unsubCerradas();
+    };
   },
 
 
