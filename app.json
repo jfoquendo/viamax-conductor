@@ -21,7 +21,12 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.viamax.conductor",
-      "softwareKeyboardLayoutMode": "resize"
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,6 +48,12 @@
       "@react-native-community/datetimepicker",
       "expo-status-bar",
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "91bfb16a-a8c4-4e75-9c6c-e4a7eb6aa17d"
+      }
+    },
+    "owner": "diyeis-team"
   }
 }

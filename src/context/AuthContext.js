@@ -21,7 +21,9 @@ import {
   fetchDriverProfile,
   saveDriverRegistration,
   subscribeDriverProfile,
+  saveDriverPushToken,
 } from '../services/driverService';
+import { registerForPushNotifications } from '../services/notificationService';
 import { getData, removeData, saveData, STORAGE_KEYS } from '../services/storage';
 
 const AuthContext = createContext(null);
@@ -138,6 +140,38 @@ export function AuthProvider({ children }) {
       mounted = false;
     };
   }, [user]);
+
+  // Registra el dispositivo para recibir notificaciones push.
+useEffect(() => {
+  if (!user?.uid || !isFirebaseConfigured) {
+    return;
+  }
+
+  let cancelled = false;
+
+  const registerPushToken = async () => {
+    try {
+      const result = await registerForPushNotifications();
+
+      if (cancelled || !result?.token) {
+        return;
+      }
+
+      await saveDriverPushToken(user.uid, result.token);
+    } catch (notificationError) {
+      console.warn(
+        '[notifications] No se pudo registrar el dispositivo:',
+        notificationError?.message
+      );
+    }
+  };
+
+  registerPushToken();
+
+  return () => {
+    cancelled = true;
+  };
+}, [user?.uid]);
 
   // 3) Estado derivado de la cuenta.
   const accountStatus = useMemo(() => {

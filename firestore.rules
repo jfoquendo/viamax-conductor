@@ -50,6 +50,13 @@ service cloud.firestore {
         && validRegistration(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['personal', 'vehicle', 'documents', 'updatedAt', 'requiresTechReview']);
+      
+      // El conductor puede actualizar únicamente su token de notificaciones.
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['pushToken', 'pushTokenUpdatedAt']);
 
       // Nadie borra perfiles desde el cliente.
       allow delete: if false;
@@ -119,14 +126,22 @@ service cloud.firestore {
       // o el dispatch.
       allow create: if false;
 
+      // Nadie crea viajes desde la app del conductor: los genera el pasajero
+      // o el dispatch.
+      allow create: if false;
+
       // Aceptar una solicitud pendiente.
-      allow update: if validTransition()
-        && allowedStatus()
-        && (
-          (isPendingRequest() && request.resource.data.status == 'accepted'
-             && request.resource.data.driverId == request.auth.uid)
-          || (isAssignedDriver() && resource.data.status != 'requested')
-        );
+      allow update: if isPendingRequest()
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.driverId == request.auth.uid
+        && validTransition()
+        && allowedStatus();
+
+      // Avanzar un viaje ya asignado al conductor.
+      allow update: if isAssignedDriver()
+        && resource.data.status != 'requested'
+        && validTransition()
+        && allowedStatus();
 
       allow delete: if false;
     }

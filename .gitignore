@@ -44,3 +44,6 @@ firebase-debug.*.log
 # generated native folders
 /ios
 /android
+
+# Firebase Admin / FCM private service account
+firebase-service-account.json
