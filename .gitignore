@@ -31,7 +31,12 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+!.env.example
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +44,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase Admin / FCM private service account
+firebase-service-account.json
