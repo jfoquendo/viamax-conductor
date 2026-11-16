@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { useActiveTrip } from '../../context/ActiveTripContext';
+import useDriverLocation from '../../hooks/useDriverLocation';
+import { serverTimestamp } from 'firebase/firestore';
 import { tripSource } from '../../services/tripService';
 import { calculateFare } from '../../utils/calculateFare';
 import {
@@ -32,39 +35,124 @@ const NEXT_STEP = {
   [TRIP_STATUS.IN_PROGRESS]: { status: TRIP_STATUS.COMPLETED, label: 'Finalizar viaje' },
 };
 
-export default function TripActiveScreen({ route, navigation }) {
+function distanceBetweenMeters(from, to) {
+  if (!from || !to) return Infinity;
+
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const deltaLat = toRadians(to.latitude - from.latitude);
+  const deltaLng = toRadians(to.longitude - from.longitude);
+
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) *
+    Math.cos(lat2) *
+    Math.sin(deltaLng / 2) ** 2;
+
+  return (
+    2 *
+    earthRadiusMeters *
+    Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  );
+}
+
+export default function TripActiveScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const tripId = route?.params?.tripId;
+  const {
+    activeTrip: trip,
+    isLoading,
+    error: activeTripError,
+    routeState,
+    setRouteState,
+  } = useActiveTrip();
+  const { location: driverLocation } = useDriverLocation(true);
 
-  const [trip, setTrip] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
-  const [liveRoute, setLiveRoute] = useState(null);
+  // La ruta vive en el contexto del viaje para sobrevivir al desmontaje
+  // de esta pantalla (por ejemplo, al abrir el menu y volver).
+  const routeOrigin = routeState?.origin ?? null;
+  const remainingRoute = routeState?.remaining ?? null;
+  const liveRoute = routeState?.live ?? null;
+
+  const setRouteOrigin = useCallback(
+    (nextOrigin) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), origin: nextOrigin }));
+    },
+    [setRouteState]
+  );
+
+  const setRemainingRoute = useCallback(
+    (nextRemaining) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), remaining: nextRemaining }));
+    },
+    [setRouteState]
+  );
+
+  const setLiveRoute = useCallback(
+    (nextLive) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), live: nextLive }));
+    },
+    [setRouteState]
+  );
+
+  const lastRouteUpdateRef = useRef(0);
+  const lastRouteLocationRef = useRef(routeState?.origin ?? null);
+
+  // Al remontar con una ruta ya calculada, se evita pedirla de nuevo sin
+  // que el conductor se haya movido.
+  useEffect(() => {
+    if (routeState?.origin) {
+      lastRouteUpdateRef.current = Date.now();
+      lastRouteLocationRef.current = routeState.origin;
+    }
+  }, []);
 
   const category = profile?.vehicle?.category ?? 'economy';
-
-  // Carga el viaje y se mantiene al día con los cambios de estado.
   useEffect(() => {
-    let isMounted = true;
+    // La ruta se recalcula tanto yendo a la recogida como en curso:
+    // el conductor se desplaza en ambos casos.
+    const isRouteActive =
+      trip?.status === TRIP_STATUS.IN_PROGRESS ||
+      trip?.status === TRIP_STATUS.DRIVER_ARRIVING ||
+      trip?.status === TRIP_STATUS.ACCEPTED;
 
-    async function load() {
-      try {
-        const data = tripId ? await tripSource.fetch(tripId) : null;
-        if (isMounted) setTrip(data);
-      } catch (loadError) {
-        if (isMounted) setError(loadError?.message ?? 'No se pudo cargar el viaje');
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+    if (!isRouteActive || !driverLocation?.latitude || !driverLocation?.longitude) {
+      return;
     }
 
-    load();
-    return () => {
-      isMounted = false;
+    const now = Date.now();
+    const elapsed = now - lastRouteUpdateRef.current;
+
+    const movedMeters = distanceBetweenMeters(
+      lastRouteLocationRef.current,
+      driverLocation
+    );
+
+    const shouldUpdate =
+      !lastRouteLocationRef.current ||
+      elapsed >= 30000 ||
+      movedMeters >= 500;
+
+    if (!shouldUpdate) return;
+
+    const nextOrigin = {
+      latitude: driverLocation.latitude,
+      longitude: driverLocation.longitude,
     };
-  }, [tripId]);
+
+    lastRouteUpdateRef.current = now;
+    lastRouteLocationRef.current = nextOrigin;
+    setRouteOrigin(nextOrigin);
+  }, [
+    trip?.status,
+    driverLocation?.latitude,
+    driverLocation?.longitude,
+  ]);
 
   const fare = useMemo(() => {
     if (!trip) return null;
@@ -81,21 +169,29 @@ export default function TripActiveScreen({ route, navigation }) {
 
   const advance = useCallback(async () => {
     if (!next || !trip) return;
-
     setIsWorking(true);
     setError(null);
+
     try {
+
       if (next.status === TRIP_STATUS.COMPLETED) {
-        // Se guardan los montos y la fecha de cierre para que el historial
-        // y las ganancias tengan de dónde leer.
+        // Se cierran los montos aqui para que el historial y las ganancias
+        // tengan de donde leer, usando la distancia real de la ruta.
         const distanceKm = liveRoute?.distanceKm ?? trip.distanceKm;
         const durationMin = liveRoute?.durationMin ?? trip.durationMin;
-        const closingFare = fare ?? calculateFare({ distanceKm, durationMin, category: trip.category ?? category, tip: trip.tip ?? 0 });
+        const closingFare =
+          fare ??
+          calculateFare({
+            distanceKm,
+            durationMin,
+            category: trip.category ?? category,
+            tip: trip.tip ?? 0,
+          });
 
         await tripSource.advance(trip.id, next.status, {
           distanceKm,
           durationMin,
-          completedAt: new Date().toISOString(),
+          completedAt: serverTimestamp(),
           fare: closingFare.fare,
           commission: closingFare.commission,
           driverEarnings: closingFare.driverEarnings,
@@ -104,14 +200,11 @@ export default function TripActiveScreen({ route, navigation }) {
           total: closingFare.total,
         });
 
-        const updated = { ...trip, status: next.status, driverEarnings: closingFare.driverEarnings };
-        setTrip(updated);
         navigation?.replace?.('TripSummary', { tripId: trip.id, fare: closingFare });
         return;
       }
 
       await tripSource.advance(trip.id, next.status);
-      setTrip({ ...trip, status: next.status });
     } catch (advanceError) {
       setError(advanceError?.message ?? 'No se pudo actualizar el viaje');
     } finally {
@@ -183,12 +276,51 @@ export default function TripActiveScreen({ route, navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <TripMapCard
-          origin={trip.origin}
-          destination={trip.destination}
-          onRouteLoaded={setLiveRoute}
-        />
 
+        <TripMapCard
+          navigationMode={
+            currentStatus === TRIP_STATUS.DRIVER_ARRIVING ||
+            currentStatus === TRIP_STATUS.IN_PROGRESS
+          }
+          origin={routeOrigin ?? driverLocation ?? trip.origin}
+          destination={
+            currentStatus === TRIP_STATUS.IN_PROGRESS
+              ? trip.destination
+              : trip.origin
+          }
+          driverLocation={driverLocation}
+          onRouteLoaded={(routeData) => { setRemainingRoute(routeData); setLiveRoute(routeData); }}
+        />
+        {remainingRoute ? (
+          <View style={styles.remainingBadge}>
+            <Ionicons
+              name="navigate-outline"
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.remainingText}>
+              faltan {remainingRoute.distanceKm} km · {remainingRoute.durationMin} min
+            </Text>
+          </View>
+        ) : null}
+
+        {remainingRoute?.instruction &&
+        (currentStatus === TRIP_STATUS.DRIVER_ARRIVING ||
+          currentStatus === TRIP_STATUS.IN_PROGRESS) ? (
+          <View style={styles.turnBadge}>
+            <Ionicons name="arrow-forward-circle" size={22} color={colors.textInverse} />
+            <View style={styles.turnTextWrap}>
+              <Text style={styles.turnText} numberOfLines={2}>
+                {remainingRoute.instruction}
+              </Text>
+              {Number(remainingRoute.nextStepDistanceM) > 0 ? (
+                <Text style={styles.turnDistance}>
+                  en {Math.round(remainingRoute.nextStepDistanceM)} m
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
         <View style={styles.card}>
           <Text style={styles.blockLabel}>Pasajero</Text>
           <Text style={styles.passenger}>{trip.passengerName ?? 'Pasajero'}</Text>
@@ -253,7 +385,7 @@ export default function TripActiveScreen({ route, navigation }) {
           ) : null}
         </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {(error || activeTripError) ? (<Text style={styles.errorText}>{error || activeTripError}</Text>) : null}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -495,6 +627,45 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.text,
+    fontWeight: '700',
+  },
+  turnBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  turnTextWrap: {
+    flex: 1,
+  },
+  turnText: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  turnDistance: {
+    color: colors.textInverse,
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.85,
+  },
+  remainingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  remainingText: {
+    color: colors.primary,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

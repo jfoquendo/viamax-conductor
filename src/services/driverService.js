@@ -11,7 +11,7 @@ export const DRIVERS_COLLECTION = 'drivers';
 
 // Escucha el perfil en tiempo real. Devuelve la función de limpieza.
 export function subscribeDriverProfile(uid, onData, onError) {
-  if (!isFirebaseConfigured || !db || !uid) return () => {};
+  if (!isFirebaseConfigured || !db || !uid) return () => { };
 
   const ref = doc(db, DRIVERS_COLLECTION, uid);
   return onSnapshot(
@@ -73,4 +73,20 @@ export async function saveDriverRegistration(uid, email, payload) {
   await setDoc(ref, document, { merge: true });
 
   return { status: 'pending_approval', requiresTechReview: document.requiresTechReview };
+}
+
+// Guarda el token push utilizado para notificaciones del conductor.
+export async function saveDriverPushToken(uid, pushToken) {
+  if (!isFirebaseConfigured || !db || !uid || !pushToken) {
+    return;
+  }
+
+  await setDoc(
+    doc(db, DRIVERS_COLLECTION, uid),
+    {
+      pushToken,
+      pushTokenUpdatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
 }

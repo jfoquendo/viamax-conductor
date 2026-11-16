@@ -5,6 +5,7 @@ import {
   DrawerContentScrollView,
   DrawerItemList,
 } from '@react-navigation/drawer';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DriverHomeScreen from '../screens/home/DriverHomeScreen';
@@ -13,7 +14,9 @@ import TripHistoryScreen from '../screens/history/TripHistoryScreen';
 import DriverProfileScreen from '../screens/profile/DriverProfileScreen';
 import TripRequestScreen from '../screens/trip/TripRequestScreen';
 import { useAuth } from '../context/AuthContext';
-import { colors, radius, spacing, typography } from '../theme';
+import { TripRequestsProvider, useTripRequestsContext } from '../context/TripRequestsContext';
+import { useActiveTrip } from '../context/ActiveTripContext';
+import { colors, radius, spacing, typography, shadows } from '../theme';
 
 const Drawer = createDrawerNavigator();
 
@@ -67,6 +70,8 @@ function CustomDrawerContent(props) {
           </View>
         </View>
 
+        <ActiveTripEntry navigation={props.navigation} />
+
         <View style={styles.items}>
           <DrawerItemList {...props} />
         </View>
@@ -85,79 +90,166 @@ function CustomDrawerContent(props) {
   );
 }
 
+function ActiveTripEntry({ navigation }) {
+  const { activeTrip } = useActiveTrip();
+  const rootNavigation = useNavigation();
+
+  if (!activeTrip) return null;
+
+  const destination = activeTrip.destination?.address ?? 'Viaje en curso';
+
+  return (
+    <TouchableOpacity
+      style={styles.activeTripEntry}
+      onPress={() => {
+        // Se navega en el Stack raíz, no en el Drawer.
+        const parent = navigation.getParent?.();
+        (parent ?? rootNavigation).navigate('TripActive', { tripId: activeTrip.id });
+        navigation.closeDrawer?.();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Volver al viaje en curso"
+    >
+      <Ionicons name="navigate" size={20} color={colors.textInverse} />
+      <View style={styles.activeTripBody}>
+        <Text style={styles.activeTripTitle}>Viaje en curso</Text>
+        <Text style={styles.activeTripSubtitle} numberOfLines={1}>
+          {destination}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textInverse} />
+    </TouchableOpacity>
+  );
+}
+
+function TripRequestBanner({ navigation }) {
+  const { request, secondsLeft } = useTripRequestsContext();
+
+  const currentRouteName = useNavigationState((state) => {
+    if (!state) return null;
+    return state.routes[state.index]?.name;
+  });
+
+  if (!request || currentRouteName === 'TripRequest') {
+    return null;
+  }
+
+  return (
+    <TouchableOpacity
+      style={styles.requestBanner}
+      onPress={() => navigation.navigate('TripRequest')}
+      activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel="Ver nueva solicitud de viaje"
+    >
+      <View style={styles.requestBannerIcon}>
+        <Ionicons
+          name="notifications"
+          size={22}
+          color={colors.textInverse}
+        />
+      </View>
+
+      <View style={styles.requestBannerContent}>
+        <Text style={styles.requestBannerTitle}>
+          Nueva solicitud de viaje
+        </Text>
+
+        <Text style={styles.requestBannerText}>
+          Tienes {secondsLeft}s para responder
+        </Text>
+      </View>
+
+      <Ionicons
+        name="chevron-forward"
+        size={22}
+        color={colors.textInverse}
+      />
+    </TouchableOpacity>
+  );
+}
+
 export default function MainDrawer() {
   return (
-    <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.cardBackground,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        },
-        headerTintColor: colors.text,
-        drawerStyle: {
-          backgroundColor: colors.cardBackground,
-          width: 280,
-        },
-        drawerActiveTintColor: colors.primary,
-        drawerInactiveTintColor: colors.textSoft,
-        drawerActiveBackgroundColor: colors.primarySoft,
-      }}
-    >
-      <Drawer.Screen
-        name="HomeDrawer"
-        component={DriverHomeScreen}
-        options={{
-          title: 'Inicio / Turno',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="map-outline" size={size} color={color} />
-          ),
+    <TripRequestsProvider>
+      <Drawer.Navigator
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenLayout={({ children, navigation }) => (
+          <View style={styles.navigatorContainer}>
+            {children}
+            <TripRequestBanner navigation={navigation} />
+          </View>
+        )}
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colors.cardBackground,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          },
+          headerTintColor: colors.text,
+          drawerStyle: {
+            backgroundColor: colors.cardBackground,
+            width: 280,
+          },
+          drawerActiveTintColor: colors.primary,
+          drawerInactiveTintColor: colors.textSoft,
+          drawerActiveBackgroundColor: colors.primarySoft,
         }}
-      />
+      >
+        <Drawer.Screen
+          name="HomeDrawer"
+          component={DriverHomeScreen}
+          options={{
+            title: 'Inicio / Turno',
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="map-outline" size={size} color={color} />
+            ),
+          }}
+        />
 
-      <Drawer.Screen
-        name="TripRequest"
-        component={TripRequestScreen}
-        options={{
-          title: 'Solicitudes',
+        <Drawer.Screen
+          name="TripRequest"
+          component={TripRequestScreen}
+          options={{
+            title: 'Solicitudes',
 
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="Earnings"
-        component={EarningsScreen}
-        options={{
-          title: 'Ganancias',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="cash-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="TripHistory"
-        component={TripHistoryScreen}
-        options={{
-          title: 'Historial de Viajes',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="Profile"
-        component={DriverProfileScreen}
-        options={{
-          title: 'Perfil y Ajustes',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-    </Drawer.Navigator>
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="notifications-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="Earnings"
+          component={EarningsScreen}
+          options={{
+            title: 'Ganancias',
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="cash-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="TripHistory"
+          component={TripHistoryScreen}
+          options={{
+            title: 'Historial de Viajes',
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="time-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="Profile"
+          component={DriverProfileScreen}
+          options={{
+            title: 'Perfil y Ajustes',
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="person-outline" size={size} color={color} />
+            ),
+          }}
+        />
+      </Drawer.Navigator>
+    </TripRequestsProvider>
   );
 }
 
@@ -229,6 +321,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  activeTripEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  activeTripBody: {
+    flex: 1,
+  },
+  activeTripTitle: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  activeTripSubtitle: {
+    color: colors.textInverse,
+    fontSize: 11,
+    opacity: 0.85,
+    marginTop: 2,
+  },
   items: {
     paddingTop: spacing.sm,
   },
@@ -245,5 +362,46 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 14,
     fontWeight: '700',
+  },
+  navigatorContainer: {
+    flex: 1,
+  },
+  requestBanner: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    top: spacing.md,
+    zIndex: 100,
+    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...shadows.card,
+  },
+  requestBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  requestBannerContent: {
+    flex: 1,
+  },
+  requestBannerTitle: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  requestBannerText: {
+    color: colors.textInverse,
+    fontSize: 12,
+    marginTop: 2,
+    opacity: 0.9,
   },
 });

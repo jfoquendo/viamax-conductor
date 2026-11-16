@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import useTripRequests from '../../hooks/useTripRequests';
+import { useTripRequestsContext } from '../../context/TripRequestsContext';
 import { useAuth } from '../../context/AuthContext';
 import { calculateFare } from '../../utils/calculateFare';
 import { tripSource } from '../../services/tripService';
+import { fetchRoute } from '../../services/routeService';
 import { PAYMENT_METHOD_LABELS, TRIP_STATUS } from '../../config/trips';
 import { colors, radius, spacing, typography, shadows } from '../../theme';
 
@@ -14,25 +15,34 @@ const formatCOP = (value) =>
 
 export default function TripRequestScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, profile } = useAuth();
-  const isDemo = tripSource.name === 'local';
-  const [simulated, setSimulated] = useState(null);
+  const { profile } = useAuth();
+  const [routeData, setRouteData] = useState(null);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const [routeWarning, setRouteWarning] = useState(null);
 
-  const { request, secondsLeft, progress, isResponding, error, accept, reject } =
-    useTripRequests({
-      enabled: Boolean(user?.uid),
-      driverId: user?.uid,
-    });
+  const {
+    request,
+    requests,
+    recentRequests,
+    pendingCount,
+    secondsLeft,
+    progress,
+    secondsFor,
+    isResponding,
+    error,
+    accept,
+    reject,
+  } = useTripRequestsContext();
 
   const category = profile?.vehicle?.category ?? 'economy';
 
-  const fare = request
+  const fare = request && routeData && !isRouteLoading
     ? calculateFare({
-        distanceKm: request.distanceKm,
-        durationMin: request.durationMin,
-        category,
-        tip: request.tip ?? 0,
-      })
+      distanceKm: routeData.distanceKm,
+      durationMin: routeData.durationMin,
+      category,
+      tip: request.tip ?? 0,
+    })
     : null;
 
   const handleAccept = useCallback(async () => {
@@ -42,15 +52,119 @@ export default function TripRequestScreen({ navigation }) {
     }
   }, [accept, navigation]);
 
-  const handleSimulate = () => {
-    if (isDemo && typeof tripSource.simulateIncoming === 'function') {
-      setSimulated(tripSource.simulateIncoming());
-    }
-  };
-
   useEffect(() => {
-    if (!request) setSimulated(null);
-  }, [request]);
+    let cancelled = false;
+
+    if (!request?.origin || !request?.destination) {
+      setRouteData(
+        request
+          ? {
+            distanceKm: request.distanceKm,
+            durationMin: request.durationMin,
+          }
+          : null
+      );
+
+      setIsRouteLoading(false);
+      setRouteWarning(
+        request
+          ? 'No hay coordenadas completas para calcular la ruta. Se muestran los datos estimados de la solicitud.'
+          : null
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setRouteData(null);
+    setRouteWarning(null);
+    setIsRouteLoading(true);
+
+    fetchRoute(request.origin, request.destination)
+      .then((route) => {
+        if (cancelled) return;
+
+        setRouteData(route);
+      })
+      .catch(() => {
+        if (cancelled) return;
+
+        setRouteData({
+          distanceKm: request.distanceKm,
+          durationMin: request.durationMin,
+        });
+        setRouteWarning(
+          'No se pudo calcular la ruta en tiempo real. Se muestran los datos estimados de la solicitud.'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRouteLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [request?.id]);
+
+  // Solicitudes disponibles ademas de la activa.
+  const otherAvailable = requests.filter((item) => item.id !== request?.id);
+
+  const queueList =
+    otherAvailable.length > 0 ? (
+      <View style={styles.queueList}>
+        <Text style={styles.queueTitle}>
+          {pendingCount} {pendingCount === 1 ? 'solicitud disponible' : 'solicitudes disponibles'}
+        </Text>
+        {otherAvailable.map((item) => {
+          const left = secondsFor(item.id);
+          return (
+            <View key={item.id} style={styles.queueItem}>
+              <View style={styles.queueDot} />
+              <View style={styles.queueBody}>
+                <Text style={styles.queueAddress} numberOfLines={1}>
+                  {item.origin?.address ?? 'Recogida'}
+                </Text>
+                <Text style={styles.queueMeta}>
+                  {item.destination?.address ?? 'Destino'}
+                </Text>
+              </View>
+              <Text style={[styles.queueTimer, left === 0 && styles.queueTimerExpired]}>
+                {left > 0 ? left + 's' : 'expirada'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
+
+  // Solicitudes descartadas por ti o canceladas: quedan visibles como historial.
+  const recentList =
+    recentRequests.length > 0 ? (
+      <View style={styles.queueList}>
+        <Text style={styles.queueTitle}>Recientes</Text>
+        {recentRequests.map((item) => {
+          const cancelada = item.status === TRIP_STATUS.CANCELLED;
+          return (
+            <View key={item.id} style={[styles.queueItem, styles.queueItemMuted]}>
+              <View style={[styles.queueDot, styles.queueDotMuted]} />
+              <View style={styles.queueBody}>
+                <Text style={styles.queueAddress} numberOfLines={1}>
+                  {item.origin?.address ?? 'Recogida'}
+                </Text>
+                <Text style={styles.queueMeta} numberOfLines={1}>
+                  {item.destination?.address ?? 'Destino'}
+                </Text>
+              </View>
+              <Text style={styles.queueStatus}>
+                {cancelada ? 'cancelada' : 'descartada'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
 
   if (!request) {
     return (
@@ -58,17 +172,15 @@ export default function TripRequestScreen({ navigation }) {
         <View style={styles.emptyBadge}>
           <Ionicons name="hourglass-outline" size={40} color={colors.textSoft} />
         </View>
-        <Text style={styles.emptyTitle}>Esperando solicitudes</Text>
+        <Text style={styles.emptyTitle}>
+          {requests.length > 0 ? 'Solicitudes en espera' : 'Esperando solicitudes'}
+        </Text>
         <Text style={styles.emptyText}>
           Mantén el turno activo en la pantalla principal para recibir viajes cercanos.
         </Text>
 
-        {isDemo ? (
-          <TouchableOpacity style={styles.demoButton} onPress={handleSimulate}>
-            <Ionicons name="flask-outline" size={18} color={colors.warning} />
-            <Text style={styles.demoText}>Simular solicitud (modo local)</Text>
-          </TouchableOpacity>
-        ) : null}
+        {queueList}
+        {recentList}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
@@ -119,11 +231,11 @@ export default function TripRequestScreen({ navigation }) {
         <View style={styles.metricsRow}>
           <View style={styles.metric}>
             <Ionicons name="speedometer-outline" size={16} color={colors.textSoft} />
-            <Text style={styles.metricValue}>{request.distanceKm} km</Text>
+            <Text style={styles.metricValue}>{isRouteLoading ? '—' : `${routeData?.distanceKm ?? request.distanceKm} km`}</Text>
           </View>
           <View style={styles.metric}>
             <Ionicons name="time-outline" size={16} color={colors.textSoft} />
-            <Text style={styles.metricValue}>{request.durationMin} min</Text>
+            <Text style={styles.metricValue}>{isRouteLoading ? '—' : `${routeData?.durationMin ?? request.durationMin} min`}</Text>
           </View>
           <View style={styles.metric}>
             <Ionicons name="navigate-outline" size={16} color={colors.textSoft} />
@@ -144,6 +256,10 @@ export default function TripRequestScreen({ navigation }) {
           {fare ? formatCOP(fare.commission) : '—'}
         </Text>
       </View>
+
+      {routeWarning ? (
+        <Text style={styles.routeWarning}>{routeWarning}</Text>
+      ) : null}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -176,11 +292,6 @@ export default function TripRequestScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {simulated ? (
-        <Text style={styles.demoNote}>
-          Solicitud simulada localmente. Se conectará a la API del curso cuando esté disponible.
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -236,6 +347,68 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: 13,
     fontWeight: '700',
+  },
+  queueList: {
+    width: '100%',
+    marginTop: spacing.xl,
+    gap: spacing.sm,
+  },
+  queueTitle: {
+    ...typography.label,
+    color: colors.textSoft,
+    marginBottom: spacing.xs,
+  },
+  queueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  queueDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  queueBody: {
+    flex: 1,
+  },
+  queueAddress: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  queueMeta: {
+    color: colors.textSoft,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  queueTimer: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  queueTimerExpired: {
+    color: colors.textSoft,
+    fontWeight: '600',
+  },
+  queueItemMuted: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    opacity: 0.75,
+  },
+  queueDotMuted: {
+    backgroundColor: colors.textSoft,
+  },
+  queueStatus: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '600',
   },
   timerRow: {
     flexDirection: 'row',
@@ -423,5 +596,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
     opacity: 0.8,
+  },
+  routeWarning: {
+    color: colors.warning,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
 });

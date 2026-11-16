@@ -2,6 +2,7 @@
 // La fuente de datos está detrás de un adaptador para poder cambiar de
 // Firestore a la API del curso sin tocar las pantallas ni los hooks.
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
@@ -12,6 +13,8 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  getDocs,
+  startAfter,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
 import { TRIP_STATUS } from '../config/trips';
@@ -21,42 +24,104 @@ export const TRIPS_COLLECTION = 'trips';
 // Normaliza un documento de Firestore a un objeto plano con id.
 const toTrip = (snapshot) => ({ id: snapshot.id, ...snapshot.data() });
 
-// Crea una solicitud de viaje local (para pruebas mientras llega la API).
-export function buildDemoRequest(overrides = {}) {
-  return {
-    id: `demo-${Date.now()}`,
-    passengerName: 'Pasajero de prueba',
-    origin: { address: 'Parque Lleras, Medellín', latitude: 6.2092, longitude: -75.5674 },
-    destination: { address: 'Aeropuerto José María Córdova', latitude: 6.1645, longitude: -75.4231 },
-    distanceKm: 8.5,
-    durationMin: 22,
-    category: 'economy',
-    paymentMethod: 'cash',
-    tip: 0,
-    status: TRIP_STATUS.REQUESTED,
-    requestedAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Adaptadores. Cada uno expone subscribePending(handler) y responde a las
-// acciones del conductor. El de Firestore es el que usa la app conectada;
-// el local sirve para probar el flujo sin backend y para la demo.
-// ---------------------------------------------------------------------------
+// Fuente de viajes: Firestore únicamente.
 
 const firestoreSource = {
   name: 'firestore',
 
   // Escucha las solicitudes pendientes más recientes.
+  // Solicitudes visibles en la bandeja: las pendientes y las que se
+  // cancelaron o vencieron recientemente (para mostrar el historial).
   subscribePending(onData, onError) {
-    if (!isFirebaseConfigured || !db) return () => {};
+    if (!isFirebaseConfigured || !db) return () => { };
 
-    const q = query(
+    const disponibles = query(
       collection(db, TRIPS_COLLECTION),
       where('status', '==', TRIP_STATUS.REQUESTED),
       orderBy('requestedAt', 'asc'),
+      limit(20)
+    );
+
+    const cerradas = query(
+      collection(db, TRIPS_COLLECTION),
+      where('status', '==', TRIP_STATUS.CANCELLED),
+      orderBy('requestedAt', 'desc'),
       limit(10)
+    );
+
+    let actuales = [];
+    let descartadas = [];
+
+    const emitir = () => {
+      const ids = new Set(actuales.map((trip) => trip.id));
+      onData([...actuales, ...descartadas.filter((trip) => !ids.has(trip.id))]);
+    };
+
+    const unsubDisponibles = onSnapshot(
+      disponibles,
+      (snapshot) => {
+        actuales = snapshot.docs.map(toTrip);
+        emitir();
+      },
+      (error) => onError?.(error)
+    );
+
+    const unsubCerradas = onSnapshot(
+      cerradas,
+      (snapshot) => {
+        descartadas = snapshot.docs.map(toTrip);
+        emitir();
+      },
+      (error) => onError?.(error)
+    );
+
+    return () => {
+      unsubDisponibles();
+      unsubCerradas();
+    };
+  },
+
+
+  subscribeActive(driverId, onData, onError) {
+    if (!isFirebaseConfigured || !db || !driverId) {
+      onData(null);
+      return () => { };
+    }
+
+    const q = query(
+      collection(db, TRIPS_COLLECTION),
+      where('driverId', '==', driverId),
+      where('status', 'in', [
+        TRIP_STATUS.ACCEPTED,
+        TRIP_STATUS.DRIVER_ARRIVING,
+        TRIP_STATUS.IN_PROGRESS,
+      ]),
+      limit(1)
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const activeTrip = snapshot.empty ? null : toTrip(snapshot.docs[0]);
+        onData(activeTrip);
+      },
+      (error) => onError?.(error)
+    );
+  },
+
+  // Viajes cerrados del conductor, del mas reciente al mas antiguo.
+  subscribeHistory(driverId, onData, onError) {
+    if (!isFirebaseConfigured || !db || !driverId) {
+      onData([]);
+      return () => { };
+    }
+
+    const q = query(
+      collection(db, TRIPS_COLLECTION),
+      where('driverId', '==', driverId),
+      where('status', 'in', [TRIP_STATUS.COMPLETED, TRIP_STATUS.PAID]),
+      orderBy('completedAt', 'desc'),
+      limit(100)
     );
 
     return onSnapshot(
@@ -64,6 +129,44 @@ const firestoreSource = {
       (snapshot) => onData(snapshot.docs.map(toTrip)),
       (error) => onError?.(error)
     );
+  },
+
+  // Carga el historial por paginas de 20 viajes.
+  async fetchHistoryPage(driverId, lastDocument = null) {
+    if (!isFirebaseConfigured || !db || !driverId) {
+      return {
+        trips: [],
+        lastDocument: null,
+        hasMore: false,
+      };
+    }
+
+    const constraints = [
+      where('driverId', '==', driverId),
+      where('status', 'in', [TRIP_STATUS.COMPLETED, TRIP_STATUS.PAID]),
+      orderBy('completedAt', 'desc'),
+    ];
+
+    if (lastDocument) {
+      constraints.push(startAfter(lastDocument));
+    }
+
+    constraints.push(limit(20));
+
+    const snapshot = await getDocs(
+      query(collection(db, TRIPS_COLLECTION), ...constraints)
+    );
+
+    const lastDoc =
+      snapshot.docs.length > 0
+        ? snapshot.docs[snapshot.docs.length - 1]
+        : null;
+
+    return {
+      trips: snapshot.docs.map(toTrip),
+      lastDocument: lastDoc,
+      hasMore: snapshot.docs.length === 20,
+    };
   },
 
   async accept(tripId, driverId) {
@@ -95,52 +198,25 @@ const firestoreSource = {
     const snapshot = await getDoc(doc(db, TRIPS_COLLECTION, tripId));
     return snapshot.exists() ? toTrip(snapshot) : null;
   },
+
+  // Marca que este conductor descarto la solicitud sin cancelarla globalmente.
+  // El viaje sigue disponible para otros conductores o para el dispatch.
+  async skipRequest(tripId, driverId) {
+    if (!isFirebaseConfigured || !db || !tripId || !driverId) return;
+
+    const ref = doc(db, TRIPS_COLLECTION, tripId);
+
+    // arrayUnion evita leer y reescribir: dos conductores pueden descartar
+    // la misma solicitud sin pisarse.
+    await updateDoc(ref, {
+      skippedBy: arrayUnion(driverId),
+      updatedAt: serverTimestamp(),
+    }).catch(() => {
+      // Si el viaje ya no existe o no es escribible, se ignora en silencio.
+    });
+  },
+
 };
 
-// Adaptador en memoria: simula el envío de una solicitud.
-export function createLocalSource() {
-  let listeners = new Set();
-  let current = null;
-
-  const emit = () => listeners.forEach((fn) => fn(current ? [current] : []));
-
-  return {
-    name: 'local',
-
-    subscribePending(onData) {
-      const handler = (data) => onData(data);
-      listeners.add(handler);
-      emit();
-      return () => listeners.delete(handler);
-    },
-
-    // Simula que llega una solicitud nueva.
-    simulateIncoming(overrides) {
-      current = buildDemoRequest(overrides);
-      emit();
-      return current;
-    },
-
-    async accept(tripId, driverId) {
-      current = { ...current, id: tripId, status: TRIP_STATUS.ACCEPTED, driverId };
-      emit();
-    },
-
-    async reject() {
-      current = null;
-      emit();
-    },
-
-    async advance(tripId, status, extra = {}) {
-      current = { ...current, ...extra, status };
-      emit();
-    },
-
-    async fetch(tripId) {
-      return current && current.id === tripId ? current : null;
-    },
-  };
-}
-
-// Fuente activa: Firestore si hay configuración, local en caso contrario.
-export const tripSource = isFirebaseConfigured ? firestoreSource : createLocalSource();
+// Fuente de datos de viajes: Firestore.
+export const tripSource = firestoreSource;

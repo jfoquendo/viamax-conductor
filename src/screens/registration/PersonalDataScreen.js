@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRegistration } from '../../context/RegistrationContext';
+import { uploadImageToCloudinary } from '../../services/cloudinaryService';
+import { selectImageSource } from '../../utils/imagePicker';
 import InputField from '../../components/forms/InputField';
 import DateField from '../../components/forms/DateField';
 import StepFooter from '../../components/forms/StepFooter';
@@ -15,22 +17,45 @@ export default function PersonalDataScreen({ navigation }) {
     useRegistration();
 
   const [touched, setTouched] = useState({});
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState(null);
 
   const markTouched = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
   // Simulación de selección de foto (usando URLs/Avatares de prueba)
-  const selectPhoto = () => {
-    const sampleAvatars = [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80',
-    ];
-    const randomAvatar =
-      sampleAvatars[Math.floor(Math.random() * sampleAvatars.length)];
-    updatePersonalData({ profilePhoto: randomAvatar });
+
+  const selectPhoto = async () => {
+    if (isUploadingPhoto) return;
+
     markTouched('profilePhoto');
+    setPhotoUploadError(null);
+
+    try {
+      const imageUri = await selectImageSource();
+
+      if (!imageUri) return;
+
+      setIsUploadingPhoto(true);
+
+      const uploaded = await uploadImageToCloudinary(
+        imageUri,
+        {
+          folder: 'viamax/drivers/profile',
+        }
+      );
+
+      updatePersonalData({
+        profilePhoto: uploaded.url,
+      });
+    } catch (error) {
+      setPhotoUploadError(
+        error?.message ?? 'No se pudo subir la foto'
+      );
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const handleNext = () => {
@@ -57,6 +82,7 @@ export default function PersonalDataScreen({ navigation }) {
         <TouchableOpacity
           style={styles.avatarButton}
           onPress={selectPhoto}
+          disabled={isUploadingPhoto}
           accessibilityRole="button"
           accessibilityLabel="Seleccionar foto de perfil"
         >
@@ -69,6 +95,18 @@ export default function PersonalDataScreen({ navigation }) {
             </View>
           )}
         </TouchableOpacity>
+
+        {isUploadingPhoto ? (
+          <Text style={styles.photoStatus}>
+            Subiendo foto…
+          </Text>
+        ) : null}
+
+        {photoUploadError ? (
+          <Text style={styles.photoError}>
+            {photoUploadError}
+          </Text>
+        ) : null}
         {touched.profilePhoto && personalErrors.profilePhoto ? (
           <Text style={styles.photoError}>{personalErrors.profilePhoto}</Text>
         ) : null}
@@ -324,5 +362,11 @@ const styles = StyleSheet.create({
   },
   genderTextActive: {
     color: colors.primary,
+  },
+  photoStatus: {
+    color: colors.primary,
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '600',
   },
 });

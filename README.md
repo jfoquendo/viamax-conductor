@@ -27,7 +27,7 @@ la UI, pero no cumple R2.
 
 ## Configuración de Firebase (gratis)
 
-Sigue la guía paso a paso en [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md).
+La configuración se describe a continuación.
 
 Resumen:
 
@@ -85,6 +85,52 @@ functions/        opcional: requiere plan Blaze, NO se usa
 - Firestore: 1 GiB, 50.000 lecturas/día, 20.000 escrituras/día.
 - Authentication por correo/contraseña: sin costo.
 - Para un proyecto de clase y las pruebas del flujo, la cuota es suficiente.
+
+## Uso de IA
+
+El proyecto se desarrolló con **asesoría de IA**: la IA explicó, comparó alternativas y ayudó a diagnosticar errores; las decisiones y la implementación se revisaron y adaptaron manualmente.
+
+El detalle completo está en [docs/AI_LOG.md](docs/AI_LOG.md), con 21 entradas que registran objetivo, consulta, resumen de la orientación recibida, qué se aplicó o descartó, archivos afectados y aprendizaje.
+
+En el código, los archivos con decisiones de diseño no triviales llevan un comentario al inicio que indica la entrada correspondiente:
+
+```javascript
+// Calculo de tarifa con asesoria de IA (docs/AI_LOG.md #3).
+```
+
+Están marcados:
+
+| Área | Archivos |
+|---|---|
+| Seguridad y permisos | `firestore.rules` |
+| Ciclo de vida de la cuenta | `src/context/AuthContext.js` |
+| Solicitudes de viaje | `src/hooks/useTripRequests.js` |
+| Rutas y mapa | `src/services/routeService.js`, `src/components/maps/TripMapCard.js` |
+| Cobro del viaje | `src/screens/trip/TripSummaryScreen.js` |
+| Tarifas y validaciones | `src/utils/calculateFare.js`, `src/utils/validators.js` |
+| Backend de pagos | `server/index.js` |
+| Notificaciones push | `server/notifications.js` |
+
+## Servicios externos
+
+| Servicio | Uso | Costo |
+|---|---|---|
+| Firebase (Spark) | Autenticación, Firestore | Gratuito |
+| Google Maps Platform | Mapa, rutas y tráfico | Cuota gratuita mensual |
+| Mercado Pago | Cobro con tarjeta (modo prueba) | Sin costo en sandbox |
+| Cloudinary | Fotos de perfil y documentos | Plan gratuito |
+
+## Backend de pagos
+
+El cobro con tarjeta requiere un servidor local que guarda el token de la pasarela:
+
+```bash
+cd server
+npm install
+npm start
+```
+
+Consulta `server/README.md` para las credenciales y el flujo completo.
 
 ## Seguridad
 

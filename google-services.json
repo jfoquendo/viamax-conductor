@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "878973294924",
+    "project_id": "viamax-conductor-92a07",
+    "storage_bucket": "viamax-conductor-92a07.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:878973294924:android:afe36cd747d3aa2b0297e9",
+        "android_client_info": {
+          "package_name": "com.viamax.conductor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZtUDpD97aVV3cZR69f83t5GurZQ9wCDg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
