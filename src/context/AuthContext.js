@@ -1,3 +1,4 @@
+// Ciclo de vida de la cuenta con asesoria de IA (docs/AI_LOG.md #9).
 // Sesión del conductor y estado de aprobación de la cuenta.
 // Con Firebase configurado: Auth + Firestore en tiempo real.
 // Sin Firebase: modo demo local (solo para desarrollo/pruebas).

@@ -20,8 +20,19 @@ export default function TripRequestScreen({ navigation }) {
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [routeWarning, setRouteWarning] = useState(null);
 
-  const { request, secondsLeft, progress, isResponding, error, accept, reject } =
-    useTripRequestsContext();
+  const {
+    request,
+    requests,
+    recentRequests,
+    pendingCount,
+    secondsLeft,
+    progress,
+    secondsFor,
+    isResponding,
+    error,
+    accept,
+    reject,
+  } = useTripRequestsContext();
 
   const category = profile?.vehicle?.category ?? 'economy';
 
@@ -97,16 +108,79 @@ export default function TripRequestScreen({ navigation }) {
     };
   }, [request?.id]);
 
+  // Solicitudes disponibles ademas de la activa.
+  const otherAvailable = requests.filter((item) => item.id !== request?.id);
+
+  const queueList =
+    otherAvailable.length > 0 ? (
+      <View style={styles.queueList}>
+        <Text style={styles.queueTitle}>
+          {pendingCount} {pendingCount === 1 ? 'solicitud disponible' : 'solicitudes disponibles'}
+        </Text>
+        {otherAvailable.map((item) => {
+          const left = secondsFor(item.id);
+          return (
+            <View key={item.id} style={styles.queueItem}>
+              <View style={styles.queueDot} />
+              <View style={styles.queueBody}>
+                <Text style={styles.queueAddress} numberOfLines={1}>
+                  {item.origin?.address ?? 'Recogida'}
+                </Text>
+                <Text style={styles.queueMeta}>
+                  {item.destination?.address ?? 'Destino'}
+                </Text>
+              </View>
+              <Text style={[styles.queueTimer, left === 0 && styles.queueTimerExpired]}>
+                {left > 0 ? left + 's' : 'expirada'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
+
+  // Solicitudes descartadas por ti o canceladas: quedan visibles como historial.
+  const recentList =
+    recentRequests.length > 0 ? (
+      <View style={styles.queueList}>
+        <Text style={styles.queueTitle}>Recientes</Text>
+        {recentRequests.map((item) => {
+          const cancelada = item.status === TRIP_STATUS.CANCELLED;
+          return (
+            <View key={item.id} style={[styles.queueItem, styles.queueItemMuted]}>
+              <View style={[styles.queueDot, styles.queueDotMuted]} />
+              <View style={styles.queueBody}>
+                <Text style={styles.queueAddress} numberOfLines={1}>
+                  {item.origin?.address ?? 'Recogida'}
+                </Text>
+                <Text style={styles.queueMeta} numberOfLines={1}>
+                  {item.destination?.address ?? 'Destino'}
+                </Text>
+              </View>
+              <Text style={styles.queueStatus}>
+                {cancelada ? 'cancelada' : 'descartada'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
+
   if (!request) {
     return (
       <View style={[styles.emptyContainer, { paddingBottom: insets.bottom + spacing.xl }]}>
         <View style={styles.emptyBadge}>
           <Ionicons name="hourglass-outline" size={40} color={colors.textSoft} />
         </View>
-        <Text style={styles.emptyTitle}>Esperando solicitudes</Text>
+        <Text style={styles.emptyTitle}>
+          {requests.length > 0 ? 'Solicitudes en espera' : 'Esperando solicitudes'}
+        </Text>
         <Text style={styles.emptyText}>
           Mantén el turno activo en la pantalla principal para recibir viajes cercanos.
         </Text>
+
+        {queueList}
+        {recentList}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
@@ -273,6 +347,68 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: 13,
     fontWeight: '700',
+  },
+  queueList: {
+    width: '100%',
+    marginTop: spacing.xl,
+    gap: spacing.sm,
+  },
+  queueTitle: {
+    ...typography.label,
+    color: colors.textSoft,
+    marginBottom: spacing.xs,
+  },
+  queueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  queueDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  queueBody: {
+    flex: 1,
+  },
+  queueAddress: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  queueMeta: {
+    color: colors.textSoft,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  queueTimer: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  queueTimerExpired: {
+    color: colors.textSoft,
+    fontWeight: '600',
+  },
+  queueItemMuted: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    opacity: 0.75,
+  },
+  queueDotMuted: {
+    backgroundColor: colors.textSoft,
+  },
+  queueStatus: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '600',
   },
   timerRow: {
     flexDirection: 'row',

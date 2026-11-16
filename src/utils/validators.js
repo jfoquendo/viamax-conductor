@@ -1,3 +1,4 @@
+// Validaciones del registro con asesoria de IA (docs/AI_LOG.md #5).
 import { calculateAge, parseDateOnly, todayStart } from './date';
 
 // Valida nombre completo: máximo 50 caracteres, solo letras y espacios

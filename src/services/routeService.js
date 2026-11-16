@@ -1,3 +1,4 @@
+// Consulta de rutas con asesoria de IA (docs/AI_LOG.md #13).
 // Cálculo de rutas con la Routes API de Google.
 // Se usa fetch directo (sin SDK extra). La clave se restringe por aplicación
 // en Google Cloud, así que exponerla en el cliente es el patrón habitual.
@@ -112,7 +113,9 @@ export async function fetchRoute(origin, destination, { force = false } = {}) {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': MAPS_API_KEY,
         'X-Goog-FieldMask':
-          'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+          'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,' +
+          'routes.legs.steps.navigationInstruction,' +
+          'routes.legs.steps.distanceMeters',
         ...(Platform.OS === 'web' ? {} : {}),
       },
       body: JSON.stringify(body),
@@ -149,10 +152,18 @@ export async function fetchRoute(origin, destination, { force = false } = {}) {
   // La duración viene como "1234s".
   const durationSeconds = Number(String(route.duration ?? '0').replace('s', '')) || 0;
 
+  // Instruccion del primer tramo, para el banner tipo GPS.
+  const steps = route.legs?.[0]?.steps ?? [];
+  const firstStep = steps[0];
+  const instruction = firstStep?.navigationInstruction?.instructions ?? null;
+  const nextStepDistanceM = firstStep?.distanceMeters ?? null;
+
   const result = {
     points,
     distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
     durationMin: Math.max(1, Math.round(durationSeconds / 60)),
+    instruction,
+    nextStepDistanceM,
   };
 
   cache.set(key, result);

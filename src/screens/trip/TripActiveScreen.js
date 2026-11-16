@@ -62,24 +62,66 @@ function distanceBetweenMeters(from, to) {
 export default function TripActiveScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { activeTrip: trip, isLoading, error: activeTripError } = useActiveTrip();
+  const {
+    activeTrip: trip,
+    isLoading,
+    error: activeTripError,
+    routeState,
+    setRouteState,
+  } = useActiveTrip();
   const { location: driverLocation } = useDriverLocation(true);
 
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState(null);
-  const [routeOrigin, setRouteOrigin] = useState(null);
-  const [remainingRoute, setRemainingRoute] = useState(null);
+  // La ruta vive en el contexto del viaje para sobrevivir al desmontaje
+  // de esta pantalla (por ejemplo, al abrir el menu y volver).
+  const routeOrigin = routeState?.origin ?? null;
+  const remainingRoute = routeState?.remaining ?? null;
+  const liveRoute = routeState?.live ?? null;
+
+  const setRouteOrigin = useCallback(
+    (nextOrigin) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), origin: nextOrigin }));
+    },
+    [setRouteState]
+  );
+
+  const setRemainingRoute = useCallback(
+    (nextRemaining) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), remaining: nextRemaining }));
+    },
+    [setRouteState]
+  );
+
+  const setLiveRoute = useCallback(
+    (nextLive) => {
+      setRouteState((prev) => ({ ...(prev ?? {}), live: nextLive }));
+    },
+    [setRouteState]
+  );
+
   const lastRouteUpdateRef = useRef(0);
-  const lastRouteLocationRef = useRef(null);
-  const [liveRoute, setLiveRoute] = useState(null);
+  const lastRouteLocationRef = useRef(routeState?.origin ?? null);
+
+  // Al remontar con una ruta ya calculada, se evita pedirla de nuevo sin
+  // que el conductor se haya movido.
+  useEffect(() => {
+    if (routeState?.origin) {
+      lastRouteUpdateRef.current = Date.now();
+      lastRouteLocationRef.current = routeState.origin;
+    }
+  }, []);
 
   const category = profile?.vehicle?.category ?? 'economy';
   useEffect(() => {
-    if (
-      trip?.status !== TRIP_STATUS.IN_PROGRESS ||
-      !driverLocation?.latitude ||
-      !driverLocation?.longitude
-    ) {
+    // La ruta se recalcula tanto yendo a la recogida como en curso:
+    // el conductor se desplaza en ambos casos.
+    const isRouteActive =
+      trip?.status === TRIP_STATUS.IN_PROGRESS ||
+      trip?.status === TRIP_STATUS.DRIVER_ARRIVING ||
+      trip?.status === TRIP_STATUS.ACCEPTED;
+
+    if (!isRouteActive || !driverLocation?.latitude || !driverLocation?.longitude) {
       return;
     }
 
@@ -236,16 +278,20 @@ export default function TripActiveScreen({ navigation }) {
       >
 
         <TripMapCard
-          origin={
+          navigationMode={
+            currentStatus === TRIP_STATUS.DRIVER_ARRIVING ||
             currentStatus === TRIP_STATUS.IN_PROGRESS
-              ? routeOrigin ?? driverLocation
+          }
+          origin={routeOrigin ?? driverLocation ?? trip.origin}
+          destination={
+            currentStatus === TRIP_STATUS.IN_PROGRESS
+              ? trip.destination
               : trip.origin
           }
-          destination={trip.destination}
           driverLocation={driverLocation}
           onRouteLoaded={(routeData) => { setRemainingRoute(routeData); setLiveRoute(routeData); }}
         />
-        {currentStatus === TRIP_STATUS.IN_PROGRESS && remainingRoute ? (
+        {remainingRoute ? (
           <View style={styles.remainingBadge}>
             <Ionicons
               name="navigate-outline"
@@ -255,6 +301,24 @@ export default function TripActiveScreen({ navigation }) {
             <Text style={styles.remainingText}>
               faltan {remainingRoute.distanceKm} km · {remainingRoute.durationMin} min
             </Text>
+          </View>
+        ) : null}
+
+        {remainingRoute?.instruction &&
+        (currentStatus === TRIP_STATUS.DRIVER_ARRIVING ||
+          currentStatus === TRIP_STATUS.IN_PROGRESS) ? (
+          <View style={styles.turnBadge}>
+            <Ionicons name="arrow-forward-circle" size={22} color={colors.textInverse} />
+            <View style={styles.turnTextWrap}>
+              <Text style={styles.turnText} numberOfLines={2}>
+                {remainingRoute.instruction}
+              </Text>
+              {Number(remainingRoute.nextStepDistanceM) > 0 ? (
+                <Text style={styles.turnDistance}>
+                  en {Math.round(remainingRoute.nextStepDistanceM)} m
+                </Text>
+              ) : null}
+            </View>
           </View>
         ) : null}
         <View style={styles.card}>
@@ -564,6 +628,30 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.text,
     fontWeight: '700',
+  },
+  turnBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  turnTextWrap: {
+    flex: 1,
+  },
+  turnText: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  turnDistance: {
+    color: colors.textInverse,
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.85,
   },
   remainingBadge: {
     flexDirection: 'row',

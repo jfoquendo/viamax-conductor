@@ -1,3 +1,4 @@
+// Calculo de tarifa con asesoria de IA (docs/AI_LOG.md #3).
 import { PRICING_CONFIG, roundFare } from '../config/pricing';
 
 /**

@@ -2,6 +2,7 @@
 // La fuente de datos está detrás de un adaptador para poder cambiar de
 // Firestore a la API del curso sin tocar las pantallas ni los hooks.
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
@@ -29,21 +30,55 @@ const firestoreSource = {
   name: 'firestore',
 
   // Escucha las solicitudes pendientes más recientes.
+  // Solicitudes visibles en la bandeja: las pendientes y las que se
+  // cancelaron o vencieron recientemente (para mostrar el historial).
   subscribePending(onData, onError) {
     if (!isFirebaseConfigured || !db) return () => { };
 
-    const q = query(
+    const disponibles = query(
       collection(db, TRIPS_COLLECTION),
       where('status', '==', TRIP_STATUS.REQUESTED),
       orderBy('requestedAt', 'asc'),
+      limit(20)
+    );
+
+    const cerradas = query(
+      collection(db, TRIPS_COLLECTION),
+      where('status', '==', TRIP_STATUS.CANCELLED),
+      orderBy('requestedAt', 'desc'),
       limit(10)
     );
 
-    return onSnapshot(
-      q,
-      (snapshot) => onData(snapshot.docs.map(toTrip)),
+    let actuales = [];
+    let descartadas = [];
+
+    const emitir = () => {
+      const ids = new Set(actuales.map((trip) => trip.id));
+      onData([...actuales, ...descartadas.filter((trip) => !ids.has(trip.id))]);
+    };
+
+    const unsubDisponibles = onSnapshot(
+      disponibles,
+      (snapshot) => {
+        actuales = snapshot.docs.map(toTrip);
+        emitir();
+      },
       (error) => onError?.(error)
     );
+
+    const unsubCerradas = onSnapshot(
+      cerradas,
+      (snapshot) => {
+        descartadas = snapshot.docs.map(toTrip);
+        emitir();
+      },
+      (error) => onError?.(error)
+    );
+
+    return () => {
+      unsubDisponibles();
+      unsubCerradas();
+    };
   },
 
 
@@ -163,6 +198,24 @@ const firestoreSource = {
     const snapshot = await getDoc(doc(db, TRIPS_COLLECTION, tripId));
     return snapshot.exists() ? toTrip(snapshot) : null;
   },
+
+  // Marca que este conductor descarto la solicitud sin cancelarla globalmente.
+  // El viaje sigue disponible para otros conductores o para el dispatch.
+  async skipRequest(tripId, driverId) {
+    if (!isFirebaseConfigured || !db || !tripId || !driverId) return;
+
+    const ref = doc(db, TRIPS_COLLECTION, tripId);
+
+    // arrayUnion evita leer y reescribir: dos conductores pueden descartar
+    // la misma solicitud sin pisarse.
+    await updateDoc(ref, {
+      skippedBy: arrayUnion(driverId),
+      updatedAt: serverTimestamp(),
+    }).catch(() => {
+      // Si el viaje ya no existe o no es escribible, se ignora en silencio.
+    });
+  },
+
 };
 
 // Fuente de datos de viajes: Firestore.
