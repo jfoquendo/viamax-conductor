@@ -1,3 +1,4 @@
+// Solicitudes entrantes con asesoria de IA (docs/AI_LOG.md #10 y #12).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { REQUEST_TIMEOUT_SECONDS, TRIP_STATUS } from '../config/trips';
 import { tripSource } from '../services/tripService';

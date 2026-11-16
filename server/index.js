@@ -1,3 +1,4 @@
+// Backend de pagos con asesoria de IA (docs/AI_LOG.md #21).
 // Backend de pagos de ViaMax (Mercado Pago Checkout Pro).
 // La app nunca ve el access token: solo recibe la URL de pago.
 require('dotenv').config();
@@ -6,6 +7,7 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const { sendTripRequestNotification } = require('./notifications');
 
 const app = express();
 app.use(cors());
@@ -55,6 +57,28 @@ const BASE_URL = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, mode: MP_ENV, sandbox: IS_TEST });
+});
+
+/**
+ * Notifica a los conductores disponibles que hay una solicitud nueva.
+ * Body: { tripId }
+ * Se puede llamar desde el dispatch, desde la app del pasajero o a mano.
+ */
+app.post('/notifications/trip', async (req, res) => {
+  const { tripId } = req.body ?? {};
+
+  if (!tripId || typeof tripId !== 'string') {
+    return res.status(400).json({ error: 'Falta tripId' });
+  }
+
+  try {
+    const result = await sendTripRequestNotification(db, tripId);
+    console.log('[notifications]', tripId, JSON.stringify(result));
+    return res.json(result);
+  } catch (error) {
+    console.error('[notifications]', error?.message ?? error);
+    return res.status(500).json({ error: 'No se pudo enviar la notificacion' });
+  }
 });
 
 /**

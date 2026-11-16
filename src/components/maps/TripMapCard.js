@@ -1,3 +1,4 @@
+// Mapa con ruta y asesoria de IA (docs/AI_LOG.md #13 y #15).
 // Mapa de viaje con la ruta dibujada.
 // Reutilizable: lo usan el viaje activo y, más adelante, el detalle del historial.
 import React, { useCallback, useEffect, useRef, useState } from 'react';

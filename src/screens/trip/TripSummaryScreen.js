@@ -1,3 +1,4 @@
+// Cierre y cobro del viaje con asesoria de IA (docs/AI_LOG.md #17 y #21).
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,

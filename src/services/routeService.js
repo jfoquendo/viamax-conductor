@@ -1,3 +1,4 @@
+// Consulta de rutas con asesoria de IA (docs/AI_LOG.md #13).
 // Cálculo de rutas con la Routes API de Google.
 // Se usa fetch directo (sin SDK extra). La clave se restringe por aplicación
 // en Google Cloud, así que exponerla en el cliente es el patrón habitual.
