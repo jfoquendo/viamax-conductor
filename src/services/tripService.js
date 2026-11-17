@@ -32,7 +32,7 @@ const firestoreSource = {
   // Escucha las solicitudes pendientes más recientes.
   // Solicitudes visibles en la bandeja: las pendientes y las que se
   // cancelaron o vencieron recientemente (para mostrar el historial).
-  subscribePending(onData, onError) {
+  subscribePending(driverId, onData, onError) {
     if (!isFirebaseConfigured || !db) return () => { };
 
     const disponibles = query(
@@ -45,6 +45,7 @@ const firestoreSource = {
     const cerradas = query(
       collection(db, TRIPS_COLLECTION),
       where('status', '==', TRIP_STATUS.CANCELLED),
+      where('driverId', '==', driverId),
       orderBy('requestedAt', 'desc'),
       limit(10)
     );
